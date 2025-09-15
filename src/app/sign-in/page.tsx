@@ -53,23 +53,6 @@ export default function SignInPage() {
 
       if (data?.user) {
         toast.success("Signed in successfully!")
-
-        // Insert/update user info into profiles table
-        const { error: profileError } = await supabase
-          .from("profiles")
-          .upsert({
-            id: data.user.id,
-            email: data.user.email,
-            full_name: data.user.user_metadata?.full_name || "", // Sử dụng full_name nếu có
-            avatar_url: data.user.user_metadata?.avatar_url || "", // Avatar nếu có
-          })
-
-        if (profileError) {
-          toast.error("Failed to update profile.")
-          return
-        }
-
-        // Redirect to dashboard
         router.push("/dashboard")
       }
     } catch (error) {

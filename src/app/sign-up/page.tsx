@@ -56,6 +56,19 @@ export default function SignUpPage() {
       }
 
       if (data?.user) {
+        // Create profile at sign-up time
+        const { error: profileError } = await supabase
+          .from('profiles')
+          .upsert({
+            id: data.user.id,
+            email: data.user.email,
+            full_name: '',
+            avatar_url: '',
+          })
+        if (profileError) {
+          toast.error('Failed to initialize profile')
+        }
+
         toast.success("Account created successfully! Please check your email for confirmation.")
         router.push("/sign-in")
       }
