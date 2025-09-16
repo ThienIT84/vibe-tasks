@@ -22,11 +22,17 @@ export default function ProfilePage() {
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
+  const [isMounted, setIsMounted] = useState(false)
   const [formData, setFormData] = useState({
     full_name: '',
     avatar_url: ''
   })
   const router = useRouter()
+
+  // Fix hydration mismatch
+  useEffect(() => {
+    setIsMounted(true)
+  }, [])
 
   // Fetch user profile data
   useEffect(() => {
@@ -48,11 +54,47 @@ export default function ProfilePage() {
 
         if (error) {
           console.error('Error fetching profile:', error)
-          toast.error('Failed to load profile')
-          return
-        }
+          
+          // If profile doesn't exist, create one
+          if (error.code === 'PGRST116') {
+            console.log('Profile not found, creating new profile...')
+            const { data: newProfile, error: createError } = await supabase
+              .from('profiles')
+              .insert({
+                id: user.id,
+                email: user.email || '',
+                full_name: '',
+                avatar_url: ''
+              })
+              .select()
+              .single()
 
-        if (profile) {
+            if (createError) {
+              console.error('Error creating profile:', createError)
+              console.error('Error details:', {
+                code: createError.code,
+                message: createError.message,
+                details: createError.details,
+                hint: createError.hint
+              })
+              toast.error(`Failed to create profile: ${createError.message || 'Unknown error'}`)
+              return
+            }
+
+            if (newProfile) {
+              setUserProfile(newProfile)
+              setFormData({
+                full_name: newProfile.full_name || '',
+                avatar_url: newProfile.avatar_url || ''
+              })
+            }
+          } else {
+            // If it's a different error (like table doesn't exist), show a more helpful message
+            console.error('Profile error details:', error)
+            toast.error('Profile system not available. Please contact support.')
+            return
+          }
+        } else if (profile) {
           setUserProfile(profile)
           setFormData({
             full_name: profile.full_name || '',
@@ -127,7 +169,8 @@ export default function ProfilePage() {
     formData.avatar_url !== (userProfile.avatar_url || '')
   )
 
-  if (isLoading) {
+  // Prevent hydration mismatch
+  if (!isMounted || isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
         <div className="max-w-md w-full space-y-8">

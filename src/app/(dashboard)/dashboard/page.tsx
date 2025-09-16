@@ -11,7 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Skeleton } from "@/components/ui/skeleton"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { toast } from "sonner"
-import { Plus, Clock, CheckCircle, Circle, LogOut, User, Mail } from "lucide-react"
+import { Plus, Clock, CheckCircle, Circle, LogOut, User, Mail, RefreshCw } from "lucide-react"
 
 interface UserProfile {
   id: string
@@ -21,26 +21,36 @@ interface UserProfile {
 }
 
 type TaskStatus = "pending" | "in_progress" | "done" | "archived"
-type Task = { id: string; user_id: string; title: string; description: string | null; status: TaskStatus; inserted_at: string; updated_at: string }
+type TaskPriority = "low" | "medium" | "high" | "urgent"
+type Task = { id: string; user_id: string; title: string; description: string | null; status: TaskStatus; priority: TaskPriority; due_date: string | null; inserted_at: string; updated_at: string }
 
 export default function Dashboard() {
   const [isLoading, setIsLoading] = useState(true)
   const [isCreating, setIsCreating] = useState(false)
   const [isDialogOpen, setIsDialogOpen] = useState(false)
-  const [newTask, setNewTask] = useState({ title: "", description: "", status: "pending" as TaskStatus, due_date: "" })
+  const [newTask, setNewTask] = useState({ title: "", description: "", status: "pending" as TaskStatus, priority: "medium" as TaskPriority, due_date: "" })
   const [isSigningOut, setIsSigningOut] = useState(false)
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null)
   const [counts, setCounts] = useState<{ pending: number; inProgress: number; done: number }>({ pending: 0, inProgress: 0, done: 0 })
   const [tasks, setTasks] = useState<Task[]>([])
   const [isFetchingTasks, setIsFetchingTasks] = useState(false)
   const [editingTask, setEditingTask] = useState<Task | null>(null)
+  const [isDeleting, setIsDeleting] = useState<string | null>(null)
+  const [isUpdating, setIsUpdating] = useState<string | null>(null)
+  const [isRefreshingCounts, setIsRefreshingCounts] = useState(false)
+  const [isMounted, setIsMounted] = useState(false)
   const router = useRouter()
   const hasInitializedRef = useRef(false)
   const isFetchingCountsRef = useRef(false)
 
+  // Fix hydration mismatch
+  useEffect(() => {
+    setIsMounted(true)
+  }, [])
+
   // Fetch user profile data
   useEffect(() => {
-    if (hasInitializedRef.current) return
+    if (!isMounted || hasInitializedRef.current) return
     hasInitializedRef.current = true
     const fetchUserProfile = async () => {
       try {
@@ -57,10 +67,54 @@ export default function Dashboard() {
           .select('*')
           .eq('id', user.id)
           .single()
+        
         if (error) {
           console.warn('Error fetching profile:', error)
+          console.warn('Error details:', {
+            code: error.code,
+            message: error.message,
+            details: error.details,
+            hint: error.hint
+          })
+          
+          // If profile doesn't exist, create one
+          if (error.code === 'PGRST116') {
+            console.log('Profile not found, creating new profile...')
+            const { data: newProfile, error: createError } = await supabase
+              .from('profiles')
+              .insert({
+                id: user.id,
+                email: user.email || '',
+                full_name: '',
+                avatar_url: ''
+              })
+              .select()
+              .single()
+
+            if (createError) {
+              console.warn('Error creating profile:', createError)
+              console.warn('Error details:', {
+                code: createError.code,
+                message: createError.message,
+                details: createError.details,
+                hint: createError.hint
+              })
+            } else if (newProfile) {
+              setUserProfile(newProfile)
+            }
+          }
+        } else if (profile) {
+          setUserProfile(profile)
+        } else {
+          // Fallback: create a basic profile from user data
+          const fallbackProfile = {
+            id: user.id,
+            email: user.email || '',
+            full_name: '',
+            avatar_url: ''
+          }
+          setUserProfile(fallbackProfile)
         }
-        if (profile) setUserProfile(profile)
 
         // Fetch task counters and list
         await Promise.all([fetchTaskCounts(), fetchTasks()])
@@ -74,12 +128,15 @@ export default function Dashboard() {
     }
 
     fetchUserProfile()
-  }, [router])
+  }, [router, isMounted])
 
-  const fetchTaskCounts = async () => {
+  const fetchTaskCounts = async (showRefreshIndicator = false) => {
     if (isFetchingCountsRef.current) return
     isFetchingCountsRef.current = true
     try {
+      if (showRefreshIndicator) {
+        setIsRefreshingCounts(true)
+      }
       const next = { pending: 0, inProgress: 0, done: 0 }
 
       const [p, ip, d] = await Promise.all([
@@ -88,9 +145,18 @@ export default function Dashboard() {
         supabase.from('tasks').select('id', { count: 'exact', head: true }).eq('status', 'done'),
       ])
 
-      if (p.error) console.warn('pending count error', p.error)
-      if (ip.error) console.warn('in_progress count error', ip.error)
-      if (d.error) console.warn('done count error', d.error)
+      if (p.error) {
+        console.warn('pending count error', p.error)
+        toast.error('Failed to load pending tasks count')
+      }
+      if (ip.error) {
+        console.warn('in_progress count error', ip.error)
+        toast.error('Failed to load in-progress tasks count')
+      }
+      if (d.error) {
+        console.warn('done count error', d.error)
+        toast.error('Failed to load completed tasks count')
+      }
 
       next.pending = p.count ?? 0
       next.inProgress = ip.count ?? 0
@@ -98,8 +164,10 @@ export default function Dashboard() {
       setCounts(next)
     } catch (e) {
       console.error('Failed to fetch counts', e)
+      toast.error('Failed to load task statistics')
     } finally {
       isFetchingCountsRef.current = false
+      setIsRefreshingCounts(false)
     }
   }
 
@@ -112,11 +180,13 @@ export default function Dashboard() {
         .order('inserted_at', { ascending: false })
       if (error) {
         console.error('Error fetching tasks:', error)
+        toast.error('Failed to load tasks')
         return
       }
       setTasks((data as Task[]) || [])
     } catch (e) {
       console.error('Failed to fetch tasks', e)
+      toast.error('Failed to load tasks')
     } finally {
       setIsFetchingTasks(false)
     }
@@ -132,6 +202,7 @@ export default function Dashboard() {
             title: newTask.title.trim(),
             description: newTask.description.trim() || null,
             status: newTask.status,
+            priority: newTask.priority,
             due_date: newTask.due_date ? newTask.due_date : null,
           })
           .eq('id', editingTask.id)
@@ -154,6 +225,7 @@ export default function Dashboard() {
               title: newTask.title.trim(),
               description: newTask.description.trim() || null,
               status: newTask.status,
+              priority: newTask.priority,
               due_date: newTask.due_date ? newTask.due_date : null,
             },
           ])
@@ -164,9 +236,9 @@ export default function Dashboard() {
         toast.success('Task created successfully!')
       }
       setIsDialogOpen(false)
-      setNewTask({ title: '', description: '', status: 'pending' })
+      setNewTask({ title: '', description: '', status: 'pending', priority: 'medium', due_date: '' })
       setEditingTask(null)
-      await Promise.all([fetchTaskCounts(), fetchTasks()])
+      await Promise.all([fetchTaskCounts(true), fetchTasks()])
     } catch (e: any) {
       toast.error(e?.message || 'Unexpected error')
     } finally {
@@ -176,7 +248,7 @@ export default function Dashboard() {
 
   const openEditTask = (task: Task) => {
     setEditingTask(task)
-    setNewTask({ title: task.title, description: task.description ?? '', status: task.status, due_date: (task as any).due_date ?? '' })
+    setNewTask({ title: task.title, description: task.description ?? '', status: task.status, priority: task.priority, due_date: (task as any).due_date ?? '' })
     setIsDialogOpen(true)
   }
 
@@ -184,15 +256,18 @@ export default function Dashboard() {
     const confirmDelete = window.confirm(`Delete task "${task.title}"?`)
     if (!confirmDelete) return
     try {
+      setIsDeleting(task.id)
       const { error } = await supabase.from('tasks').delete().eq('id', task.id)
       if (error) {
         toast.error(error.message || 'Failed to delete task')
         return
       }
-      toast.success('Task deleted')
-      await Promise.all([fetchTaskCounts(), fetchTasks()])
+      toast.success('Task deleted successfully')
+      await Promise.all([fetchTaskCounts(true), fetchTasks()])
     } catch (e: any) {
-      toast.error(e?.message || 'Unexpected error')
+      toast.error(e?.message || 'Failed to delete task')
+    } finally {
+      setIsDeleting(null)
     }
   }
 
@@ -211,6 +286,15 @@ export default function Dashboard() {
     } finally {
       setIsSigningOut(false)
     }
+  }
+
+  // Prevent hydration mismatch
+  if (!isMounted) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
+      </div>
+    )
   }
 
   if (isLoading) {
@@ -257,6 +341,29 @@ export default function Dashboard() {
             </Card>
           ))}
         </div>
+
+        {/* Task List Skeleton */}
+        <Card>
+          <CardHeader>
+            <Skeleton className="h-6 w-16" />
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              {Array.from({ length: 3 }).map((_, i) => (
+                <div key={i} className="flex items-center space-x-4 p-4 border rounded-lg">
+                  <Skeleton className="h-4 w-48" />
+                  <Skeleton className="h-4 w-32" />
+                  <Skeleton className="h-4 w-20" />
+                  <Skeleton className="h-4 w-16" />
+                  <div className="ml-auto flex space-x-2">
+                    <Skeleton className="h-8 w-16" />
+                    <Skeleton className="h-8 w-16" />
+                  </div>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
       </div>
     )
   }
@@ -272,6 +379,14 @@ export default function Dashboard() {
           </p>
         </div>
         <div className="flex gap-2">
+          <Button 
+            variant="outline" 
+            onClick={() => Promise.all([fetchTaskCounts(true), fetchTasks()])}
+            disabled={isRefreshingCounts || isFetchingTasks}
+          >
+            <RefreshCw className={`h-4 w-4 mr-2 ${isRefreshingCounts || isFetchingTasks ? 'animate-spin' : ''}`} />
+            Refresh
+          </Button>
           <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
             <DialogTrigger asChild>
               <Button disabled={isCreating}>
@@ -292,10 +407,24 @@ export default function Dashboard() {
                   <label className="text-sm font-medium" htmlFor="task-desc">Description</label>
                   <Textarea id="task-desc" placeholder="Task description" value={newTask.description} onChange={(e) => setNewTask({ ...newTask, description: e.target.value })} />
                 </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                   <div className="space-y-2">
                     <label className="text-sm font-medium" htmlFor="task-due">Due Date</label>
                     <Input id="task-due" type="date" value={newTask.due_date} onChange={(e) => setNewTask({ ...newTask, due_date: e.target.value })} />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Priority</label>
+                    <Select value={newTask.priority} onValueChange={(v: TaskPriority) => setNewTask({ ...newTask, priority: v })}>
+                      <SelectTrigger className="w-full">
+                        <SelectValue placeholder="Select priority" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="low">Low</SelectItem>
+                        <SelectItem value="medium">Medium</SelectItem>
+                        <SelectItem value="high">High</SelectItem>
+                        <SelectItem value="urgent">Urgent</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
                   <div className="space-y-2">
                     <label className="text-sm font-medium">Status</label>
@@ -315,7 +444,14 @@ export default function Dashboard() {
               <DialogFooter className="pt-4">
                 <Button variant="outline" onClick={() => { setIsDialogOpen(false); setEditingTask(null); }} disabled={isCreating}>Cancel</Button>
                 <Button onClick={handleCreateOrUpdateTask} disabled={isCreating || !newTask.title.trim()}>
-                  {isCreating ? (editingTask ? 'Saving...' : 'Creating...') : (editingTask ? 'Save' : 'Create')}
+                  {isCreating ? (
+                    <div className="flex items-center">
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                      {editingTask ? 'Saving...' : 'Creating...'}
+                    </div>
+                  ) : (
+                    editingTask ? 'Save' : 'Create'
+                  )}
                 </Button>
               </DialogFooter>
             </DialogContent>
@@ -374,7 +510,14 @@ export default function Dashboard() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-muted-foreground">Pending</p>
-                <p className="text-3xl font-bold">{counts.pending}</p>
+                {isRefreshingCounts ? (
+                  <div className="flex items-center">
+                    <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-500 mr-2"></div>
+                    <Skeleton className="h-8 w-12" />
+                  </div>
+                ) : (
+                  <p className="text-3xl font-bold">{counts.pending}</p>
+                )}
               </div>
               <Circle className="h-8 w-8 text-blue-500" />
             </div>
@@ -386,7 +529,14 @@ export default function Dashboard() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-muted-foreground">In Progress</p>
-                <p className="text-3xl font-bold">{counts.inProgress}</p>
+                {isRefreshingCounts ? (
+                  <div className="flex items-center">
+                    <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-yellow-500 mr-2"></div>
+                    <Skeleton className="h-8 w-12" />
+                  </div>
+                ) : (
+                  <p className="text-3xl font-bold">{counts.inProgress}</p>
+                )}
               </div>
               <Clock className="h-8 w-8 text-yellow-500" />
             </div>
@@ -398,7 +548,14 @@ export default function Dashboard() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-muted-foreground">Done</p>
-                <p className="text-3xl font-bold">{counts.done}</p>
+                {isRefreshingCounts ? (
+                  <div className="flex items-center">
+                    <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-green-500 mr-2"></div>
+                    <Skeleton className="h-8 w-12" />
+                  </div>
+                ) : (
+                  <p className="text-3xl font-bold">{counts.done}</p>
+                )}
               </div>
               <CheckCircle className="h-8 w-8 text-green-500" />
             </div>
@@ -418,6 +575,7 @@ export default function Dashboard() {
                 <tr className="border-b text-left text-muted-foreground">
                   <th className="py-2 pr-4">Title</th>
                   <th className="py-2 pr-4">Description</th>
+                  <th className="py-2 pr-4">Priority</th>
                   <th className="py-2 pr-4">Status</th>
                   <th className="py-2 text-right">Actions</th>
                 </tr>
@@ -428,24 +586,56 @@ export default function Dashboard() {
                     <tr key={i} className="border-b">
                       <td className="py-3 pr-4"><Skeleton className="h-4 w-40" /></td>
                       <td className="py-3 pr-4"><Skeleton className="h-4 w-72" /></td>
+                      <td className="py-3 pr-4"><Skeleton className="h-4 w-20" /></td>
                       <td className="py-3 pr-4"><Skeleton className="h-4 w-24" /></td>
                       <td className="py-3"><div className="flex justify-end gap-2"><Skeleton className="h-8 w-16" /><Skeleton className="h-8 w-16" /></div></td>
                     </tr>
                   ))
                 ) : tasks.length === 0 ? (
                   <tr>
-                    <td colSpan={4} className="py-6 text-center text-muted-foreground">No tasks yet</td>
+                    <td colSpan={5} className="py-6 text-center text-muted-foreground">No tasks yet</td>
                   </tr>
                 ) : (
                   tasks.map((task) => (
                     <tr key={task.id} className="border-b">
                       <td className="py-3 pr-4 align-top max-w-[280px] truncate">{task.title}</td>
                       <td className="py-3 pr-4 align-top max-w-[480px] truncate">{task.description}</td>
+                      <td className="py-3 pr-4 align-top">
+                        <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
+                          task.priority === 'urgent' ? 'bg-red-100 text-red-800' :
+                          task.priority === 'high' ? 'bg-orange-100 text-orange-800' :
+                          task.priority === 'medium' ? 'bg-yellow-100 text-yellow-800' :
+                          'bg-green-100 text-green-800'
+                        }`}>
+                          {task.priority.charAt(0).toUpperCase() + task.priority.slice(1)}
+                        </span>
+                      </td>
                       <td className="py-3 pr-4 align-top capitalize">{task.status.replace('_', ' ')}</td>
                       <td className="py-3 align-top">
                         <div className="flex justify-end gap-2">
-                          <Button variant="outline" size="sm" onClick={() => openEditTask(task)}>Edit</Button>
-                          <Button variant="destructive" size="sm" onClick={() => handleDeleteTask(task)}>Delete</Button>
+                          <Button 
+                            variant="outline" 
+                            size="sm" 
+                            onClick={() => openEditTask(task)}
+                            disabled={isDeleting === task.id || isUpdating === task.id}
+                          >
+                            Edit
+                          </Button>
+                          <Button 
+                            variant="destructive" 
+                            size="sm" 
+                            onClick={() => handleDeleteTask(task)}
+                            disabled={isDeleting === task.id || isUpdating === task.id}
+                          >
+                            {isDeleting === task.id ? (
+                              <div className="flex items-center">
+                                <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-white mr-1"></div>
+                                Deleting...
+                              </div>
+                            ) : (
+                              'Delete'
+                            )}
+                          </Button>
                         </div>
                       </td>
                     </tr>

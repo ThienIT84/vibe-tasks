@@ -1,10 +1,26 @@
-Bạn hãy tạo folder `src/types` trong project và thêm file `task.ts` với nội dung sau:
+/**
+ * Type definitions for the Vibe Tasks application
+ */
 
-```ts
-// src/types/task.ts
+// =============================================
+// ENUMS AND TYPES
+// =============================================
 
 export type TaskPriority = 'low' | 'medium' | 'high' | 'urgent';
 export type TaskStatus = 'pending' | 'in_progress' | 'done' | 'archived';
+
+// =============================================
+// CORE INTERFACES
+// =============================================
+
+export interface UserProfile {
+  id: string;
+  email: string;
+  full_name: string;
+  avatar_url: string;
+  created_at?: string;
+  updated_at?: string;
+}
 
 export interface Task {
   id: string;
@@ -17,6 +33,10 @@ export interface Task {
   inserted_at: string; // ISO timestamp
   updated_at: string;  // ISO timestamp
 }
+
+// =============================================
+// INPUT/OUTPUT INTERFACES
+// =============================================
 
 export interface CreateTaskInput {
   title: string;
@@ -32,4 +52,37 @@ export interface UpdateTaskInput {
   due_date?: string | null;
   priority?: TaskPriority;
   status?: TaskStatus;
+}
+
+export interface UpdateProfileInput {
+  full_name?: string;
+  avatar_url?: string;
+}
+
+// =============================================
+// API RESPONSE TYPES
+// =============================================
+
+export interface ApiResponse<T = any> {
+  data?: T;
+  error?: string;
+  message?: string;
+}
+
+export interface TaskCounts {
+  pending: number;
+  inProgress: number;
+  done: number;
+}
+
+// =============================================
+// UTILITY TYPES
+// =============================================
+
+export type LoadingState = 'idle' | 'loading' | 'success' | 'error';
+
+export interface FormState {
+  isLoading: boolean;
+  error: string | null;
+  success: boolean;
 }
