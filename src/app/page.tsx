@@ -16,8 +16,8 @@ export default function Home() {
       if (error) throw error
       setResult(JSON.stringify({ hasSession: !!data.session }, null, 2))
       toast.success("Kết nối Supabase OK")
-    } catch (e: any) {
-      setResult(`Lỗi: ${e?.message ?? "unknown"}`)
+    } catch (e: unknown) {
+      setResult(`Lỗi: ${(e as Error)?.message ?? "unknown"}`)
       toast.error("Ping Supabase thất bại")
     }
   }
@@ -86,7 +86,7 @@ export default function Home() {
           </CardHeader>
           <CardContent>
             <p className="text-muted-foreground text-sm">
-              Set and track your team's goals with progress monitoring and analytics.
+              Set and track your team&apos;s goals with progress monitoring and analytics.
             </p>
           </CardContent>
         </Card>

@@ -36,7 +36,7 @@ export default function Dashboard() {
   const [isFetchingTasks, setIsFetchingTasks] = useState(false)
   const [editingTask, setEditingTask] = useState<Task | null>(null)
   const [isDeleting, setIsDeleting] = useState<string | null>(null)
-  const [isUpdating, setIsUpdating] = useState<string | null>(null)
+  const [isUpdating] = useState<string | null>(null)
   const [isRefreshingCounts, setIsRefreshingCounts] = useState(false)
   const [isMounted, setIsMounted] = useState(false)
   const router = useRouter()
@@ -239,8 +239,8 @@ export default function Dashboard() {
       setNewTask({ title: '', description: '', status: 'pending', priority: 'medium', due_date: '' })
       setEditingTask(null)
       await Promise.all([fetchTaskCounts(true), fetchTasks()])
-    } catch (e: any) {
-      toast.error(e?.message || 'Unexpected error')
+    } catch (e: unknown) {
+      toast.error((e as Error)?.message || 'Unexpected error')
     } finally {
       setIsCreating(false)
     }
@@ -248,7 +248,7 @@ export default function Dashboard() {
 
   const openEditTask = (task: Task) => {
     setEditingTask(task)
-    setNewTask({ title: task.title, description: task.description ?? '', status: task.status, priority: task.priority, due_date: (task as any).due_date ?? '' })
+    setNewTask({ title: task.title, description: task.description ?? '', status: task.status, priority: task.priority, due_date: task.due_date ?? '' })
     setIsDialogOpen(true)
   }
 
@@ -264,8 +264,8 @@ export default function Dashboard() {
       }
       toast.success('Task deleted successfully')
       await Promise.all([fetchTaskCounts(true), fetchTasks()])
-    } catch (e: any) {
-      toast.error(e?.message || 'Failed to delete task')
+    } catch (e: unknown) {
+      toast.error((e as Error)?.message || 'Failed to delete task')
     } finally {
       setIsDeleting(null)
     }
@@ -281,7 +281,7 @@ export default function Dashboard() {
       }
       toast.success('Signed out successfully')
       router.push('/sign-in')
-    } catch (error) {
+    } catch {
       toast.error('An unexpected error occurred')
     } finally {
       setIsSigningOut(false)

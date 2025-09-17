@@ -2,8 +2,7 @@
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { Button } from "@/components/ui/button"
-import { cn } from "@/lib/utils"
-import { Menu, X, Home, BarChart3, Settings, LogIn, User } from "lucide-react"
+import { Menu, X, Home, BarChart3, LogIn, User } from "lucide-react"
 import { useState } from "react"
 
 export default function Navbar() {

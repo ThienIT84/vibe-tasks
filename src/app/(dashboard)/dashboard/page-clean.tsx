@@ -2,6 +2,7 @@
 
 import { useState } from "react"
 import { useRouter } from "next/navigation"
+import { Task } from "@/types/task"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog"
@@ -10,13 +11,12 @@ import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { toast } from "sonner"
 import { Plus, Clock, CheckCircle, Circle, LogOut, User, Mail, RefreshCw } from "lucide-react"
 
 // Custom hooks and utilities
 import { useAuth, useProfile, useTasks, useTaskCounts, useIsMounted } from "@/lib/hooks"
-import { TASK_STATUSES, TASK_PRIORITIES, TASK_PRIORITY_COLORS, TOAST_MESSAGES } from "@/lib/constants"
-import { getInitials, truncateText } from "@/lib/utils"
+import { TASK_STATUSES, TASK_PRIORITIES, TASK_PRIORITY_COLORS } from "@/lib/constants"
+import { getInitials } from "@/lib/utils"
 import type { TaskStatus, TaskPriority, CreateTaskInput } from "@/types/task"
 
 export default function Dashboard() {
@@ -24,7 +24,7 @@ export default function Dashboard() {
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [isCreating, setIsCreating] = useState(false)
   const [isDeleting, setIsDeleting] = useState<string | null>(null)
-  const [editingTask, setEditingTask] = useState<any>(null)
+  const [editingTask, setEditingTask] = useState<Task | null>(null)
   const [newTask, setNewTask] = useState<CreateTaskInput>({
     title: "",
     description: "",
@@ -68,7 +68,13 @@ export default function Dashboard() {
       if (editingTask) {
         await updateTask(editingTask.id, newTask)
       } else {
-        await createTask(newTask)
+        await createTask({
+          title: newTask.title,
+          description: newTask.description || null,
+          due_date: newTask.due_date || null,
+          priority: newTask.priority || 'medium',
+          status: newTask.status || 'pending'
+        })
       }
       
       setIsDialogOpen(false)
@@ -90,7 +96,7 @@ export default function Dashboard() {
     }
   }
 
-  const handleDeleteTask = async (task: any) => {
+  const handleDeleteTask = async (task: Task) => {
     const confirmDelete = window.confirm(`Delete task "${task.title}"?`)
     if (!confirmDelete) return
     
@@ -105,7 +111,7 @@ export default function Dashboard() {
     }
   }
 
-  const openEditTask = (task: any) => {
+  const openEditTask = (task: Task) => {
     setEditingTask(task)
     setNewTask({
       title: task.title,
@@ -225,7 +231,7 @@ export default function Dashboard() {
                     <Input 
                       id="task-due" 
                       type="date" 
-                      value={newTask.due_date} 
+                      value={newTask.due_date || ''} 
                       onChange={(e) => setNewTask({ ...newTask, due_date: e.target.value })} 
                     />
                   </div>

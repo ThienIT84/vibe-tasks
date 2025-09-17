@@ -55,7 +55,7 @@ export default function SignInPage() {
         toast.success("Signed in successfully!")
         router.push("/dashboard")
       }
-    } catch (error) {
+    } catch {
       toast.error("An unexpected error occurred. Please try again.")
     } finally {
       setIsLoading(false)
@@ -84,7 +84,7 @@ export default function SignInPage() {
       }
 
       toast.success("Password reset email sent! Check your inbox.")
-    } catch (error) {
+    } catch {
       toast.error("Failed to send reset email. Please try again.")
     }
   }
@@ -191,7 +191,7 @@ export default function SignInPage() {
             {/* Sign Up Link */}
             <div className="mt-6 text-center">
               <p className="text-sm text-muted-foreground">
-                Don't have an account?{" "}
+                Don&apos;t have an account?{" "}
                 <Link 
                   href="/sign-up" 
                   className="font-medium text-primary hover:underline"
