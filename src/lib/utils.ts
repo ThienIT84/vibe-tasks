@@ -57,7 +57,7 @@ export function isValidPassword(password: string): boolean {
 /**
  * Debounce function
  */
-export function debounce<T extends (...args: any[]) => any>(
+export function debounce<T extends (...args: unknown[]) => unknown>(
   func: T,
   wait: number
 ): (...args: Parameters<T>) => void {
@@ -86,7 +86,7 @@ export function truncateText(text: string, maxLength: number): string {
 /**
  * Check if a value is empty (null, undefined, empty string, or empty array)
  */
-export function isEmpty(value: any): boolean {
+export function isEmpty(value: unknown): boolean {
   if (value === null || value === undefined) return true
   if (typeof value === 'string') return value.trim() === ''
   if (Array.isArray(value)) return value.length === 0

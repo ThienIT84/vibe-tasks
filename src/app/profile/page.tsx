@@ -283,7 +283,7 @@ export default function ProfilePage() {
               <div className="space-y-2">
                 <Label htmlFor="avatar_url">Avatar URL</Label>
                 <div className="relative">
-                  <Image className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                  <Image className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" aria-hidden="true" />
                   <Input
                     id="avatar_url"
                     type="url"

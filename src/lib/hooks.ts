@@ -2,11 +2,11 @@
  * Custom React hooks for the Vibe Tasks application
  */
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from './supabase'
 import { toast } from 'sonner'
-import type { UserProfile, Task, TaskCounts, LoadingState } from '@/types/task'
+import type { UserProfile, Task, TaskCounts } from '@/types/task'
 
 // =============================================
 // AUTHENTICATION HOOKS
@@ -16,7 +16,7 @@ import type { UserProfile, Task, TaskCounts, LoadingState } from '@/types/task'
  * Hook to manage user authentication state
  */
 export function useAuth() {
-  const [user, setUser] = useState<any>(null)
+  const [user, setUser] = useState<UserProfile | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const router = useRouter()
 
@@ -24,7 +24,20 @@ export function useAuth() {
     const getUser = async () => {
       try {
         const { data: { user } } = await supabase.auth.getUser()
-        setUser(user)
+        if (user) {
+          // Convert Supabase User to UserProfile
+          const userProfile: UserProfile = {
+            id: user.id,
+            email: user.email || '',
+            full_name: user.user_metadata?.full_name || '',
+            avatar_url: user.user_metadata?.avatar_url || '',
+            created_at: user.created_at,
+            updated_at: user.updated_at
+          }
+          setUser(userProfile)
+        } else {
+          setUser(null)
+        }
       } catch (error) {
         console.error('Error getting user:', error)
       } finally {
@@ -34,9 +47,22 @@ export function useAuth() {
 
     getUser()
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(  
       (event, session) => {
-        setUser(session?.user ?? null)
+        if (session?.user) {
+          // Convert Supabase User to UserProfile
+          const userProfile: UserProfile = {
+            id: session.user.id,
+            email: session.user.email || '',
+            full_name: session.user.user_metadata?.full_name || '',
+            avatar_url: session.user.user_metadata?.avatar_url || '',
+            created_at: session.user.created_at,
+            updated_at: session.user.updated_at
+          }
+          setUser(userProfile)
+        } else {
+          setUser(null)
+        }
         setIsLoading(false)
       }
     )
@@ -105,9 +131,9 @@ export function useProfile() {
       } else {
         setProfile(data)
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Error fetching profile:', err)
-      setError(err.message || 'Failed to load profile')
+      setError((err as Error)?.message || 'Failed to load profile')
     } finally {
       setIsLoading(false)
     }
@@ -126,9 +152,9 @@ export function useProfile() {
 
       setProfile(prev => prev ? { ...prev, ...updates } : null)
       toast.success('Profile updated successfully!')
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Error updating profile:', err)
-      toast.error(err.message || 'Failed to update profile')
+      toast.error((err as Error)?.message || 'Failed to update profile')
     }
   }
 
@@ -159,9 +185,9 @@ export function useTasks() {
 
       if (fetchError) throw fetchError
       setTasks(data || [])
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Error fetching tasks:', err)
-      setError(err.message || 'Failed to load tasks')
+      setError((err as Error)?.message || 'Failed to load tasks')
     } finally {
       setIsLoading(false)
     }
@@ -182,9 +208,9 @@ export function useTasks() {
       setTasks(prev => [data[0], ...prev])
       toast.success('Task created successfully!')
       return data[0]
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Error creating task:', err)
-      toast.error(err.message || 'Failed to create task')
+      toast.error((err as Error)?.message || 'Failed to create task')
       throw err
     }
   }
@@ -202,9 +228,9 @@ export function useTasks() {
       setTasks(prev => prev.map(task => task.id === id ? data[0] : task))
       toast.success('Task updated successfully!')
       return data[0]
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Error updating task:', err)
-      toast.error(err.message || 'Failed to update task')
+      toast.error((err as Error)?.message || 'Failed to update task')
       throw err
     }
   }
@@ -220,9 +246,9 @@ export function useTasks() {
 
       setTasks(prev => prev.filter(task => task.id !== id))
       toast.success('Task deleted successfully!')
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Error deleting task:', err)
-      toast.error(err.message || 'Failed to delete task')
+      toast.error((err as Error)?.message || 'Failed to delete task')
       throw err
     }
   }
