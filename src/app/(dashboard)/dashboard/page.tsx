@@ -11,7 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Skeleton } from "@/components/ui/skeleton"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { toast } from "sonner"
-import { Plus, Clock, CheckCircle, Circle, LogOut, User, Mail, RefreshCw } from "lucide-react"
+import { Plus, Clock, CheckCircle, Circle, LogOut, User, Mail, RefreshCw, CheckSquare } from "lucide-react"
 
 interface UserProfile {
   id: string
@@ -381,6 +381,13 @@ export default function Dashboard() {
         <div className="flex gap-2">
           <Button 
             variant="outline" 
+            onClick={() => router.push('/tasks')}
+          >
+            <CheckSquare className="h-4 w-4 mr-2" />
+            View All Tasks
+          </Button>
+          <Button 
+            variant="outline" 
             onClick={() => Promise.all([fetchTaskCounts(true), fetchTasks()])}
             disabled={isRefreshingCounts || isFetchingTasks}
           >
@@ -566,7 +573,17 @@ export default function Dashboard() {
       {/* Task List */}
       <Card>
         <CardHeader>
-          <CardTitle>Tasks</CardTitle>
+          <div className="flex items-center justify-between">
+            <CardTitle>Recent Tasks</CardTitle>
+            <Button 
+              variant="outline" 
+              size="sm"
+              onClick={() => router.push('/tasks')}
+            >
+              <CheckSquare className="h-4 w-4 mr-2" />
+              View All Tasks
+            </Button>
+          </div>
         </CardHeader>
         <CardContent>
           <div className="overflow-x-auto">

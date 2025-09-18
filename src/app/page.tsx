@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { toast } from "sonner"
 import Link from "next/link"
-import { CheckCircle, Users, Calendar, Target, ArrowRight } from "lucide-react"
+import { CheckCircle, Users, Calendar, Target, ArrowRight, CheckSquare } from "lucide-react"
 
 export default function Home() {
   const [result, setResult] = useState<string>("Chưa kiểm tra")
@@ -41,9 +41,12 @@ export default function Home() {
               <ArrowRight className="ml-2 h-4 w-4" />
             </Button>
           </Link>
-          <Button variant="outline" size="lg" className="w-full sm:w-auto">
-            Learn More
-          </Button>
+          <Link href="/tasks">
+            <Button variant="outline" size="lg" className="w-full sm:w-auto">
+              <CheckSquare className="mr-2 h-4 w-4" />
+              Manage Tasks
+            </Button>
+          </Link>
         </div>
       </section>
 

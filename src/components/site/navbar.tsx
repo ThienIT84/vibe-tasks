@@ -2,7 +2,7 @@
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { Button } from "@/components/ui/button"
-import { Menu, X, Home, BarChart3, LogIn, User } from "lucide-react"
+import { Menu, X, Home, BarChart3, LogIn, User, CheckSquare } from "lucide-react"
 import { useState } from "react"
 
 export default function Navbar() {
@@ -12,6 +12,7 @@ export default function Navbar() {
   const navigation = [
     { name: 'Home', href: '/', icon: Home },
     { name: 'Dashboard', href: '/dashboard', icon: BarChart3 },
+    { name: 'Tasks', href: '/tasks', icon: CheckSquare },
     { name: 'Profile', href: '/profile', icon: User },
   ]
 

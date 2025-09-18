@@ -1,13 +1,13 @@
-import { notFound } from 'next/navigation';
+import { notFound, redirect } from 'next/navigation';
 import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
 import TaskDetail from '@/components/tasks/TaskDetail';
 import { Task } from '@/types/task';
 
 interface TaskPageProps {
-  params: {
+  params: Promise<{
     id: string;
-  };
+  }>;
 }
 
 async function getTask(id: string): Promise<Task | null> {
@@ -25,12 +25,14 @@ async function getTask(id: string): Promise<Task | null> {
     }
   );
 
+  // Check authentication
   const { data: { user }, error: authError } = await supabase.auth.getUser();
   
   if (authError || !user) {
-    return null;
+    redirect('/sign-in');
   }
 
+  // Fetch task by ID, scoped by user_id
   const { data: task, error } = await supabase
     .from('tasks')
     .select('*')
@@ -42,11 +44,12 @@ async function getTask(id: string): Promise<Task | null> {
     return null;
   }
 
-  return task;
+  return task as Task;
 }
 
 export default async function TaskPage({ params }: TaskPageProps) {
-  const task = await getTask(params.id);
+  const resolvedParams = await params;
+  const task = await getTask(resolvedParams.id);
 
   if (!task) {
     notFound();
@@ -54,7 +57,9 @@ export default async function TaskPage({ params }: TaskPageProps) {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <TaskDetail task={task} />
+      <div className="container mx-auto px-4 py-8">
+        <TaskDetail task={task} />
+      </div>
     </div>
   );
 }
