@@ -2,8 +2,7 @@ import { redirect } from 'next/navigation';
 import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
 import Link from 'next/link';
-import TaskTable from '@/components/tasks/TaskTable';
-import TaskFilters from '@/components/tasks/TaskFilters';
+import TaskListClient from '@/components/tasks/TaskListClient';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { BarChart3, Home, ChevronRight } from 'lucide-react';
@@ -145,31 +144,12 @@ export default async function TasksPage({ searchParams }: TasksPageProps) {
             </div>
           </div>
 
-          {/* Filters */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Filters & Search</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <TaskFilters searchParams={resolvedSearchParams} />
-            </CardContent>
-          </Card>
-
-          {/* Task Table */}
-          <Card>
-            <CardHeader>
-              <CardTitle>
-                All Tasks ({totalCount})
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <TaskTable 
-                tasks={tasks} 
-                pagination={pagination}
-                searchParams={resolvedSearchParams}
-              />
-            </CardContent>
-          </Card>
+          {/* Task List with Loading */}
+          <TaskListClient 
+            initialTasks={tasks}
+            totalCount={totalCount}
+            searchParams={resolvedSearchParams}
+          />
         </div>
       </div>
     </div>

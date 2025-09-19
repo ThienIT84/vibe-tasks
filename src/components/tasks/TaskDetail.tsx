@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Task, TaskStatus, TaskPriority } from '@/types/task';
@@ -49,23 +49,36 @@ import {
 import { supabase } from '@/lib/supabase';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
+import TaskForm from './TaskForm';
+import TaskDetailSkeleton from './TaskDetailSkeleton';
+import { TaskFormData } from '@/lib/schemas/task';
 
 interface TaskDetailProps {
   task: Task;
+  onTaskUpdate?: () => void;
 }
 
-export default function TaskDetail({ task }: TaskDetailProps) {
+export default function TaskDetail({ task, onTaskUpdate }: TaskDetailProps) {
   const router = useRouter();
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [isUpdating, setIsUpdating] = useState(false);
-  const [editForm, setEditForm] = useState({
-    title: task.title,
-    description: task.description || '',
-    priority: task.priority,
-    status: task.status,
-    due_date: task.due_date || '',
-  });
+  const [isMounted, setIsMounted] = useState(false);
+
+  // Fix hydration mismatch
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
+
+  // Debug logging
+  console.log('TaskDetail - task:', task);
+  console.log('TaskDetail - isMounted:', isMounted);
+
+  // Early return if task is not available
+  if (!task) {
+    console.log('TaskDetail - No task, showing skeleton');
+    return <TaskDetailSkeleton />;
+  }
 
   const getPriorityColor = (priority: TaskPriority) => {
     switch (priority) {
@@ -99,55 +112,95 @@ export default function TaskDetail({ task }: TaskDetailProps) {
 
   const formatDate = (dateString: string | null) => {
     if (!dateString) return 'No due date';
+    if (!isMounted) return 'Loading...';
     return format(new Date(dateString), 'MMM dd, yyyy');
+  };
+
+  const isDueSoon = (dueDate: string | null) => {
+    if (!dueDate || !isMounted) return false;
+    const due = new Date(dueDate);
+    const now = new Date();
+    const diffInHours = (due.getTime() - now.getTime()) / (1000 * 60 * 60);
+    return diffInHours <= 48 && diffInHours >= 0;
+  };
+
+  const isOverdue = (dueDate: string | null) => {
+    if (!dueDate || !isMounted) return false;
+    const due = new Date(dueDate);
+    const now = new Date();
+    return due < now;
   };
 
   const handleStatusChange = async (newStatus: TaskStatus) => {
     try {
       setIsUpdating(true);
-      const { error } = await supabase
-        .from('tasks')
-        .update({ status: newStatus })
-        .eq('id', task.id);
+      
+      const response = await fetch(`/api/tasks/${task.id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          title: task.title,
+          description: task.description,
+          priority: task.priority,
+          status: newStatus,
+          due_date: task.due_date,
+        }),
+      });
 
-      if (error) {
-        toast.error('Failed to update task status');
-        return;
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
       }
 
-      toast.success('Task status updated successfully');
-      router.refresh();
+      const data = await response.json();
+      
+      if (data.task) {
+        toast.success('Task status updated successfully');
+        onTaskUpdate?.();
+        router.refresh();
+      }
     } catch (error) {
-      toast.error('An unexpected error occurred');
+      console.error('Error updating task status:', error);
+      toast.error('Failed to update task status');
     } finally {
       setIsUpdating(false);
     }
   };
 
-  const handleEdit = async () => {
+  const handleEdit = async (data: TaskFormData) => {
     try {
       setIsUpdating(true);
-      const { error } = await supabase
-        .from('tasks')
-        .update({
-          title: editForm.title.trim(),
-          description: editForm.description.trim() || null,
-          priority: editForm.priority,
-          status: editForm.status,
-          due_date: editForm.due_date ? editForm.due_date : null,
-        })
-        .eq('id', task.id);
+      
+      const response = await fetch(`/api/tasks/${task.id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          title: data.title.trim(),
+          description: data.description?.trim() || null,
+          priority: data.priority,
+          status: data.status,
+          due_date: data.due_date ? data.due_date : null,
+        }),
+      });
 
-      if (error) {
-        toast.error('Failed to update task');
-        return;
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
       }
 
-      toast.success('Task updated successfully');
-      setIsEditDialogOpen(false);
-      router.refresh();
+      const result = await response.json();
+      
+      if (result.task) {
+        toast.success('Task updated successfully');
+        setIsEditDialogOpen(false);
+        onTaskUpdate?.();
+        router.refresh();
+      }
     } catch (error) {
-      toast.error('An unexpected error occurred');
+      console.error('Error updating task:', error);
+      toast.error('Failed to update task');
     } finally {
       setIsUpdating(false);
     }
@@ -175,15 +228,6 @@ export default function TaskDetail({ task }: TaskDetailProps) {
     }
   };
 
-  const resetEditForm = () => {
-    setEditForm({
-      title: task.title,
-      description: task.description || '',
-      priority: task.priority,
-      status: task.status,
-      due_date: task.due_date || '',
-    });
-  };
 
   return (
     <div className="max-w-4xl mx-auto space-y-6">
@@ -215,17 +259,41 @@ export default function TaskDetail({ task }: TaskDetailProps) {
         <CardHeader className="pb-4">
           <div className="flex items-start justify-between">
             <div className="flex-1">
-              <CardTitle className="text-3xl font-bold text-gray-900 mb-2">
-                {task.title}
-              </CardTitle>
+              <div className="flex items-center gap-3 mb-2">
+                <CardTitle className="text-3xl font-bold text-gray-900">
+                  {task.title}
+                </CardTitle>
+                <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${
+                  task.priority === 'urgent' ? 'bg-red-100 text-red-800' :
+                  task.priority === 'high' ? 'bg-orange-100 text-orange-800' :
+                  task.priority === 'medium' ? 'bg-yellow-100 text-yellow-800' :
+                  'bg-green-100 text-green-800'
+                }`}>
+                  {task.priority.charAt(0).toUpperCase() + task.priority.slice(1)}
+                </span>
+              </div>
               <div className="flex items-center gap-4 text-sm text-gray-600">
-                <div className="flex items-center gap-1">
+                <div className="flex items-center gap-2">
                   <Calendar className="w-4 h-4" />
                   <span>Due: {formatDate(task.due_date)}</span>
+                  {task.due_date && (
+                    <div className="flex gap-1">
+                      {isOverdue(task.due_date) && (
+                        <Badge variant="destructive" className="text-xs px-2 py-0.5">
+                          Overdue
+                        </Badge>
+                      )}
+                      {isDueSoon(task.due_date) && !isOverdue(task.due_date) && (
+                        <Badge variant="outline" className="text-xs px-2 py-0.5 border-orange-200 text-orange-700 bg-orange-50">
+                          Due Soon
+                        </Badge>
+                      )}
+                    </div>
+                  )}
                 </div>
                 <div className="flex items-center gap-1">
                   <Clock className="w-4 h-4" />
-                  <span>Created: {format(new Date(task.inserted_at), 'MMM dd, yyyy')}</span>
+                  <span>Created: {isMounted ? format(new Date(task.inserted_at), 'MMM dd, yyyy') : 'Loading...'}</span>
                 </div>
               </div>
             </div>
@@ -271,10 +339,7 @@ export default function TaskDetail({ task }: TaskDetailProps) {
 
             <Button
               variant="outline"
-              onClick={() => {
-                resetEditForm();
-                setIsEditDialogOpen(true);
-              }}
+              onClick={() => setIsEditDialogOpen(true)}
               disabled={isUpdating || isDeleting}
             >
               <Edit className="h-4 w-4 mr-2" />
@@ -320,98 +385,20 @@ export default function TaskDetail({ task }: TaskDetailProps) {
           <DialogHeader>
             <DialogTitle>Edit Task</DialogTitle>
           </DialogHeader>
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <label className="text-sm font-medium" htmlFor="edit-title">Title</label>
-              <Input
-                id="edit-title"
-                placeholder="Task title"
-                value={editForm.title}
-                onChange={(e) => setEditForm({ ...editForm, title: e.target.value })}
-              />
-            </div>
-            <div className="space-y-2">
-              <label className="text-sm font-medium" htmlFor="edit-description">Description</label>
-              <Textarea
-                id="edit-description"
-                placeholder="Task description"
-                value={editForm.description}
-                onChange={(e) => setEditForm({ ...editForm, description: e.target.value })}
-                rows={4}
-              />
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              <div className="space-y-2">
-                <label className="text-sm font-medium" htmlFor="edit-due-date">Due Date</label>
-                <Input
-                  id="edit-due-date"
-                  type="date"
-                  value={editForm.due_date}
-                  onChange={(e) => setEditForm({ ...editForm, due_date: e.target.value })}
-                />
-              </div>
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Priority</label>
-                <Select
-                  value={editForm.priority}
-                  onValueChange={(value: TaskPriority) => setEditForm({ ...editForm, priority: value })}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select priority" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="low">Low</SelectItem>
-                    <SelectItem value="medium">Medium</SelectItem>
-                    <SelectItem value="high">High</SelectItem>
-                    <SelectItem value="urgent">Urgent</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Status</label>
-                <Select
-                  value={editForm.status}
-                  onValueChange={(value: TaskStatus) => setEditForm({ ...editForm, status: value })}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select status" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="pending">Pending</SelectItem>
-                    <SelectItem value="in_progress">In Progress</SelectItem>
-                    <SelectItem value="done">Done</SelectItem>
-                    <SelectItem value="archived">Archived</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-          </div>
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => setIsEditDialogOpen(false)}
-              disabled={isUpdating}
-            >
-              <X className="h-4 w-4 mr-2" />
-              Cancel
-            </Button>
-            <Button
-              onClick={handleEdit}
-              disabled={isUpdating || !editForm.title.trim()}
-            >
-              {isUpdating ? (
-                <div className="flex items-center">
-                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                  Saving...
-                </div>
-              ) : (
-                <>
-                  <Save className="h-4 w-4 mr-2" />
-                  Save Changes
-                </>
-              )}
-            </Button>
-          </DialogFooter>
+          <TaskForm
+            initialData={{
+              title: task.title,
+              description: task.description || '',
+              due_date: task.due_date || '',
+              priority: task.priority,
+              status: task.status,
+            }}
+            onSubmit={handleEdit}
+            onCancel={() => setIsEditDialogOpen(false)}
+            isLoading={isUpdating}
+            submitButtonText="Save Changes"
+            title="Edit Task"
+          />
         </DialogContent>
       </Dialog>
     </div>

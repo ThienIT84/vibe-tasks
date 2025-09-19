@@ -12,6 +12,8 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { toast } from "sonner"
 import { Plus, Clock, CheckCircle, Circle, LogOut, User, Mail, RefreshCw, CheckSquare } from "lucide-react"
+import TaskForm from "@/components/tasks/TaskForm"
+import { TaskFormData } from "@/lib/schemas/task"
 
 interface UserProfile {
   id: string
@@ -36,7 +38,7 @@ export default function Dashboard() {
   const [isFetchingTasks, setIsFetchingTasks] = useState(false)
   const [editingTask, setEditingTask] = useState<Task | null>(null)
   const [isDeleting, setIsDeleting] = useState<string | null>(null)
-  const [isUpdating] = useState<string | null>(null)
+  const [isUpdating, setIsUpdating] = useState<string | null>(null)
   const [isRefreshingCounts, setIsRefreshingCounts] = useState(false)
   const [isMounted, setIsMounted] = useState(false)
   const router = useRouter()
@@ -192,18 +194,18 @@ export default function Dashboard() {
     }
   }
 
-  const handleCreateOrUpdateTask = async () => {
+  const handleCreateOrUpdateTask = async (data: TaskFormData) => {
     try {
       setIsCreating(true)
       if (editingTask) {
         const { error } = await supabase
           .from('tasks')
           .update({
-            title: newTask.title.trim(),
-            description: newTask.description.trim() || null,
-            status: newTask.status,
-            priority: newTask.priority,
-            due_date: newTask.due_date ? newTask.due_date : null,
+            title: data.title.trim(),
+            description: data.description.trim() || null,
+            status: data.status,
+            priority: data.priority,
+            due_date: data.due_date ? data.due_date : null,
           })
           .eq('id', editingTask.id)
         if (error) {
@@ -222,11 +224,11 @@ export default function Dashboard() {
           .insert([
             {
               user_id: user.id,
-              title: newTask.title.trim(),
-              description: newTask.description.trim() || null,
-              status: newTask.status,
-              priority: newTask.priority,
-              due_date: newTask.due_date ? newTask.due_date : null,
+              title: data.title.trim(),
+              description: data.description.trim() || null,
+              status: data.status,
+              priority: data.priority,
+              due_date: data.due_date ? data.due_date : null,
             },
           ])
         if (error) {
@@ -401,66 +403,27 @@ export default function Dashboard() {
                 {isCreating ? "Creating..." : "Create Task"}
               </Button>
             </DialogTrigger>
-            <DialogContent>
+            <DialogContent className="max-w-2xl">
               <DialogHeader>
                 <DialogTitle>{editingTask ? 'Edit Task' : 'Create Task'}</DialogTitle>
               </DialogHeader>
-              <div className="space-y-4">
-                <div className="space-y-2">
-                  <label className="text-sm font-medium" htmlFor="task-title">Title</label>
-                  <Input id="task-title" placeholder="Task title" value={newTask.title} onChange={(e) => setNewTask({ ...newTask, title: e.target.value })} />
-                </div>
-                <div className="space-y-2">
-                  <label className="text-sm font-medium" htmlFor="task-desc">Description</label>
-                  <Textarea id="task-desc" placeholder="Task description" value={newTask.description} onChange={(e) => setNewTask({ ...newTask, description: e.target.value })} />
-                </div>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium" htmlFor="task-due">Due Date</label>
-                    <Input id="task-due" type="date" value={newTask.due_date} onChange={(e) => setNewTask({ ...newTask, due_date: e.target.value })} />
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium">Priority</label>
-                    <Select value={newTask.priority} onValueChange={(v: TaskPriority) => setNewTask({ ...newTask, priority: v })}>
-                      <SelectTrigger className="w-full">
-                        <SelectValue placeholder="Select priority" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="low">Low</SelectItem>
-                        <SelectItem value="medium">Medium</SelectItem>
-                        <SelectItem value="high">High</SelectItem>
-                        <SelectItem value="urgent">Urgent</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium">Status</label>
-                    <Select value={newTask.status} onValueChange={(v: TaskStatus) => setNewTask({ ...newTask, status: v })}>
-                      <SelectTrigger className="w-full">
-                        <SelectValue placeholder="Select status" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="pending">Pending</SelectItem>
-                        <SelectItem value="in_progress">In Progress</SelectItem>
-                        <SelectItem value="done">Done</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-              </div>
-              <DialogFooter className="pt-4">
-                <Button variant="outline" onClick={() => { setIsDialogOpen(false); setEditingTask(null); }} disabled={isCreating}>Cancel</Button>
-                <Button onClick={handleCreateOrUpdateTask} disabled={isCreating || !newTask.title.trim()}>
-                  {isCreating ? (
-                    <div className="flex items-center">
-                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                      {editingTask ? 'Saving...' : 'Creating...'}
-                    </div>
-                  ) : (
-                    editingTask ? 'Save' : 'Create'
-                  )}
-                </Button>
-              </DialogFooter>
+              <TaskForm
+                initialData={editingTask ? {
+                  title: editingTask.title,
+                  description: editingTask.description || '',
+                  due_date: editingTask.due_date || '',
+                  priority: editingTask.priority,
+                  status: editingTask.status,
+                } : undefined}
+                onSubmit={handleCreateOrUpdateTask}
+                onCancel={() => {
+                  setIsDialogOpen(false);
+                  setEditingTask(null);
+                }}
+                isLoading={isCreating}
+                submitButtonText={editingTask ? 'Save Changes' : 'Create Task'}
+                title={editingTask ? 'Edit Task' : 'Create Task'}
+              />
             </DialogContent>
           </Dialog>
           <Button 

@@ -1,7 +1,7 @@
 import { notFound, redirect } from 'next/navigation';
 import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
-import TaskDetail from '@/components/tasks/TaskDetail';
+import TaskDetailClient from '@/components/tasks/TaskDetailClient';
 import { Task } from '@/types/task';
 
 interface TaskPageProps {
@@ -58,7 +58,7 @@ export default async function TaskPage({ params }: TaskPageProps) {
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="container mx-auto px-4 py-8">
-        <TaskDetail task={task} />
+        <TaskDetailClient initialTask={task} />
       </div>
     </div>
   );
