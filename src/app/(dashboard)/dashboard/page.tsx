@@ -1,5 +1,5 @@
 'use client'
-import { useState, useEffect, useRef } from "react"
+import { useState, useEffect, useRef, useCallback } from "react"
 import { useRouter } from "next/navigation"
 import { supabase } from "@/lib/supabase"
 import { Button } from "@/components/ui/button"
@@ -11,9 +11,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Skeleton } from "@/components/ui/skeleton"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { toast } from "sonner"
-import { Plus, Clock, CheckCircle, Circle, LogOut, User, Mail, RefreshCw, CheckSquare } from "lucide-react"
+import { Plus, Clock, CheckCircle, Circle, User, Mail, RefreshCw, CheckSquare, BarChart3 } from "lucide-react"
 import TaskForm from "@/components/tasks/TaskForm"
 import { TaskFormData } from "@/lib/schemas/task"
+import { useBroadcastChannel, type BroadcastMessage } from "@/lib/hooks/broadcast"
+import AnalyticsDashboard from "@/components/analytics/AnalyticsDashboard"
 
 interface UserProfile {
   id: string
@@ -31,7 +33,6 @@ export default function Dashboard() {
   const [isCreating, setIsCreating] = useState(false)
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [newTask, setNewTask] = useState({ title: "", description: "", status: "pending" as TaskStatus, priority: "medium" as TaskPriority, due_date: "" })
-  const [isSigningOut, setIsSigningOut] = useState(false)
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null)
   const [counts, setCounts] = useState<{ pending: number; inProgress: number; done: number }>({ pending: 0, inProgress: 0, done: 0 })
   const [tasks, setTasks] = useState<Task[]>([])
@@ -41,14 +42,62 @@ export default function Dashboard() {
   const [isUpdating, setIsUpdating] = useState<string | null>(null)
   const [isRefreshingCounts, setIsRefreshingCounts] = useState(false)
   const [isMounted, setIsMounted] = useState(false)
+  const [showAnalytics, setShowAnalytics] = useState(false)
   const router = useRouter()
   const hasInitializedRef = useRef(false)
   const isFetchingCountsRef = useRef(false)
+  const fetchTaskCountsRef = useRef<((showRefreshIndicator?: boolean) => Promise<void>) | undefined>(undefined)
+  const fetchTasksRef = useRef<(() => Promise<void>) | undefined>(undefined)
+
+  // Handle cross-tab communication
+  const handleBroadcastMessage = useCallback((message: BroadcastMessage) => {
+    console.log('Dashboard received broadcast message:', message);
+    
+    switch (message.type) {
+      case 'TASK_CREATED':
+        console.log('Dashboard: Task created, refreshing data');
+        fetchTaskCountsRef.current?.(true);
+        fetchTasksRef.current?.();
+        break;
+      case 'TASK_UPDATED':
+        console.log('Dashboard: Task updated, refreshing data');
+        fetchTaskCountsRef.current?.(true);
+        fetchTasksRef.current?.();
+        break;
+      case 'TASK_DELETED':
+        console.log('Dashboard: Task deleted, refreshing data');
+        fetchTaskCountsRef.current?.(true);
+        fetchTasksRef.current?.();
+        break;
+      case 'TASK_STATUS_CHANGED':
+        console.log('Dashboard: Task status changed, refreshing data');
+        fetchTaskCountsRef.current?.(true);
+        fetchTasksRef.current?.();
+        break;
+      case 'TASK_PRIORITY_CHANGED':
+        console.log('Dashboard: Task priority changed, refreshing data');
+        fetchTaskCountsRef.current?.(true);
+        fetchTasksRef.current?.();
+        break;
+      case 'REFRESH_DASHBOARD':
+        // Force refresh dashboard
+        console.log('Dashboard: Force refreshing dashboard');
+        fetchTaskCountsRef.current?.(true);
+        fetchTasksRef.current?.();
+        break;
+    }
+  }, []);
+
+  const { broadcastTaskCreated, broadcastTaskUpdated, broadcastTaskDeleted } = useBroadcastChannel(
+    'vibe-tasks-sync',
+    handleBroadcastMessage
+  );
 
   // Fix hydration mismatch
   useEffect(() => {
     setIsMounted(true)
   }, [])
+
 
   // Fetch user profile data
   useEffect(() => {
@@ -180,6 +229,7 @@ export default function Dashboard() {
         .from('tasks')
         .select('*')
         .order('inserted_at', { ascending: false })
+        .limit(10) // Chỉ lấy 10 task gần đây nhất
       if (error) {
         console.error('Error fetching tasks:', error)
         toast.error('Failed to load tasks')
@@ -194,6 +244,12 @@ export default function Dashboard() {
     }
   }
 
+  // Update refs when functions are defined
+  useEffect(() => {
+    fetchTaskCountsRef.current = fetchTaskCounts;
+    fetchTasksRef.current = fetchTasks;
+  }, [fetchTaskCounts, fetchTasks]);
+
   const handleCreateOrUpdateTask = async (data: TaskFormData) => {
     try {
       setIsCreating(true)
@@ -202,7 +258,7 @@ export default function Dashboard() {
           .from('tasks')
           .update({
             title: data.title.trim(),
-            description: data.description.trim() || null,
+            description: data.description?.trim() || null,
             status: data.status,
             priority: data.priority,
             due_date: data.due_date ? data.due_date : null,
@@ -213,29 +269,35 @@ export default function Dashboard() {
           return
         }
         toast.success('Task updated successfully!')
+        // Broadcast task update to other tabs
+        broadcastTaskUpdated({ id: editingTask.id, ...data });
       } else {
         const { data: { user } } = await supabase.auth.getUser()
         if (!user) {
           toast.error('Unauthorized')
           return
         }
-        const { error } = await supabase
+        const { data: newTask, error } = await supabase
           .from('tasks')
           .insert([
             {
               user_id: user.id,
               title: data.title.trim(),
-              description: data.description.trim() || null,
+              description: data.description?.trim() || null,
               status: data.status,
               priority: data.priority,
               due_date: data.due_date ? data.due_date : null,
             },
           ])
+          .select()
+          .single()
         if (error) {
           toast.error(error.message || 'Failed to create task')
           return
         }
         toast.success('Task created successfully!')
+        // Broadcast task creation to other tabs
+        broadcastTaskCreated(newTask);
       }
       setIsDialogOpen(false)
       setNewTask({ title: '', description: '', status: 'pending', priority: 'medium', due_date: '' })
@@ -265,6 +327,8 @@ export default function Dashboard() {
         return
       }
       toast.success('Task deleted successfully')
+      // Broadcast task deletion to other tabs
+      broadcastTaskDeleted(task.id);
       await Promise.all([fetchTaskCounts(true), fetchTasks()])
     } catch (e: unknown) {
       toast.error((e as Error)?.message || 'Failed to delete task')
@@ -273,22 +337,6 @@ export default function Dashboard() {
     }
   }
 
-  const handleSignOut = async () => {
-    setIsSigningOut(true)
-    try {
-      const { error } = await supabase.auth.signOut()
-      if (error) {
-        toast.error('Error signing out')
-        return
-      }
-      toast.success('Signed out successfully')
-      router.push('/sign-in')
-    } catch {
-      toast.error('An unexpected error occurred')
-    } finally {
-      setIsSigningOut(false)
-    }
-  }
 
   // Prevent hydration mismatch
   if (!isMounted) {
@@ -370,6 +418,11 @@ export default function Dashboard() {
     )
   }
 
+  // Show Analytics Dashboard if toggled
+  if (showAnalytics) {
+    return <AnalyticsDashboard onBackToDashboard={() => setShowAnalytics(false)} />;
+  }
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -395,6 +448,13 @@ export default function Dashboard() {
           >
             <RefreshCw className={`h-4 w-4 mr-2 ${isRefreshingCounts || isFetchingTasks ? 'animate-spin' : ''}`} />
             Refresh
+          </Button>
+          <Button 
+            variant={showAnalytics ? "default" : "outline"}
+            onClick={() => setShowAnalytics(!showAnalytics)}
+          >
+            <BarChart3 className="h-4 w-4 mr-2" />
+            {showAnalytics ? "Hide Analytics" : "Show Analytics"}
           </Button>
           <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
             <DialogTrigger asChild>
@@ -426,14 +486,6 @@ export default function Dashboard() {
               />
             </DialogContent>
           </Dialog>
-          <Button 
-            variant="outline"
-            onClick={handleSignOut}
-            disabled={isSigningOut}
-          >
-            <LogOut className="h-4 w-4 mr-2" />
-            {isSigningOut ? "Signing Out..." : "Sign Out"}
-          </Button>
         </div>
       </div>
 
@@ -537,7 +589,14 @@ export default function Dashboard() {
       <Card>
         <CardHeader>
           <div className="flex items-center justify-between">
-            <CardTitle>Recent Tasks</CardTitle>
+            <div>
+              <CardTitle>Recent Tasks (Last 10)</CardTitle>
+              {!isFetchingTasks && tasks.length > 0 && (
+                <p className="text-sm text-muted-foreground mt-1">
+                  Showing {tasks.length} of your most recent tasks
+                </p>
+              )}
+            </div>
             <Button 
               variant="outline" 
               size="sm"
@@ -573,7 +632,15 @@ export default function Dashboard() {
                   ))
                 ) : tasks.length === 0 ? (
                   <tr>
-                    <td colSpan={5} className="py-6 text-center text-muted-foreground">No tasks yet</td>
+                    <td colSpan={5} className="py-6 text-center text-muted-foreground">
+                      No recent tasks. <Button 
+                        variant="link" 
+                        className="p-0 h-auto text-blue-600 hover:text-blue-800"
+                        onClick={() => router.push('/tasks')}
+                      >
+                        View all tasks
+                      </Button>
+                    </td>
                   </tr>
                 ) : (
                   tasks.map((task) => (

@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createRouteHandlerSupabaseClient } from '@/lib/supabase-route-handler';
+import { cookies } from 'next/headers';
+import { createServerClient } from '@supabase/ssr';
 
 export async function GET(
   request: NextRequest,
@@ -42,25 +44,12 @@ export async function PUT(
 ) {
   try {
     const resolvedParams = await params;
-    const cookieStore = await cookies();
     const body = await request.json();
     
-    const supabase = createServerClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-      {
-        cookies: {
-          getAll() {
-            return cookieStore.getAll();
-          },
-          setAll(cookiesToSet) {
-            cookiesToSet.forEach(({ name, value, options }) => {
-              cookieStore.set(name, value, options);
-            });
-          },
-        },
-      }
-    );
+    console.log('PUT /api/tasks/[id] - Request body:', body);
+    console.log('PUT /api/tasks/[id] - Task ID:', resolvedParams.id);
+    
+    const supabase = await createRouteHandlerSupabaseClient();
 
     // Check authentication
     const { data: { user }, error: authError } = await supabase.auth.getUser();
@@ -77,7 +66,7 @@ export async function PUT(
         description: body.description,
         priority: body.priority,
         status: body.status,
-        due_date: body.due_date,
+        due_date: body.due_date || null,
       })
       .eq('id', resolvedParams.id)
       .eq('user_id', user.id)
@@ -86,9 +75,10 @@ export async function PUT(
 
     if (error) {
       console.error('Error updating task:', error);
-      return NextResponse.json({ error: 'Failed to update task' }, { status: 400 });
+      return NextResponse.json({ error: 'Failed to update task', details: error.message }, { status: 400 });
     }
 
+    console.log('PUT /api/tasks/[id] - Task updated successfully:', task);
     return NextResponse.json({ task });
   } catch (error) {
     console.error('API Error:', error);
