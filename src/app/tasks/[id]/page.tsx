@@ -1,6 +1,5 @@
 import { notFound, redirect } from 'next/navigation';
-import { createServerClient } from '@supabase/ssr';
-import { cookies } from 'next/headers';
+import { createServerSupabaseClient } from '@/lib/supabase-server';
 import TaskDetailClient from '@/components/tasks/TaskDetailClient';
 import { Task } from '@/types/task';
 
@@ -11,19 +10,7 @@ interface TaskPageProps {
 }
 
 async function getTask(id: string): Promise<Task | null> {
-  const cookieStore = await cookies();
-  
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        get(name: string) {
-          return cookieStore.get(name)?.value;
-        },
-      },
-    }
-  );
+  const supabase = await createServerSupabaseClient();
 
   // Check authentication
   const { data: { user }, error: authError } = await supabase.auth.getUser();

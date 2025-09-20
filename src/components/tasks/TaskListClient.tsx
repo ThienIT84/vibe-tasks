@@ -9,6 +9,11 @@ import { Task, TaskStatus, TaskPriority } from '@/types/task';
 interface TaskListClientProps {
   initialTasks: Task[];
   totalCount: number;
+  pagination: {
+    page: number;
+    pageSize: number;
+    totalPages: number;
+  };
   searchParams: {
     q?: string;
     status?: TaskStatus;
@@ -22,11 +27,32 @@ interface TaskListClientProps {
 export default function TaskListClient({ 
   initialTasks, 
   totalCount, 
+  pagination,
   searchParams 
 }: TaskListClientProps) {
   const [tasks, setTasks] = useState<Task[]>(initialTasks);
   const [isLoading, setIsLoading] = useState(false);
   const [currentPage, setCurrentPage] = useState(parseInt(searchParams.page || '1'));
+
+  // Update tasks when searchParams change (from server-side)
+  useEffect(() => {
+    console.log('TaskListClient: Updating tasks from server', {
+      initialTasksLength: initialTasks.length,
+      currentPage: searchParams.page,
+      searchParams: searchParams
+    });
+    setTasks(initialTasks);
+    setCurrentPage(parseInt(searchParams.page || '1'));
+  }, [initialTasks, searchParams.page]);
+
+  // Reset loading state when tasks change
+  useEffect(() => {
+    console.log('TaskListClient: Reset loading state', {
+      searchParams: searchParams,
+      currentPage: searchParams.page
+    });
+    setIsLoading(false);
+  }, [initialTasks, searchParams]);
 
   const handleSearch = async (newSearchParams: typeof searchParams) => {
     setIsLoading(true);
@@ -73,16 +99,12 @@ export default function TaskListClient({
     <div className="space-y-6">
       <TaskFilters 
         searchParams={searchParams}
-        onSearch={handleSearch}
       />
       <TaskTable 
         tasks={tasks}
         setTasks={setTasks}
-        pagination={{
-          page: currentPage,
-          pageSize: 10,
-          totalPages: Math.ceil(totalCount / 10)
-        }}
+        pagination={pagination}
+        totalCount={totalCount}
         searchParams={searchParams}
       />
     </div>

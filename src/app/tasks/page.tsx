@@ -1,6 +1,5 @@
 import { redirect } from 'next/navigation';
-import { createServerClient } from '@supabase/ssr';
-import { cookies } from 'next/headers';
+import { createServerSupabaseClient } from '@/lib/supabase-server';
 import Link from 'next/link';
 import TaskListClient from '@/components/tasks/TaskListClient';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -20,19 +19,7 @@ interface TasksPageProps {
 }
 
 async function getTasks(searchParams: Awaited<TasksPageProps['searchParams']>) {
-  const cookieStore = await cookies();
-  
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        get(name: string) {
-          return cookieStore.get(name)?.value;
-        },
-      },
-    }
-  );
+  const supabase = await createServerSupabaseClient();
 
   // Check authentication
   const { data: { user }, error: authError } = await supabase.auth.getUser();
@@ -44,7 +31,7 @@ async function getTasks(searchParams: Awaited<TasksPageProps['searchParams']>) {
   // Build query
   let query = supabase
     .from('tasks')
-    .select('*')
+    .select('*', { count: 'exact' })
     .eq('user_id', user.id);
 
   // Apply filters
@@ -80,14 +67,16 @@ async function getTasks(searchParams: Awaited<TasksPageProps['searchParams']>) {
     return { tasks: [], totalCount: 0, error: error.message };
   }
 
+  const totalCount = count || 0;
+
   return {
     tasks: (tasks as Task[]) || [],
-    totalCount: count || 0,
+    totalCount,
     error: null,
     pagination: {
       page,
       pageSize,
-      totalPages: Math.ceil((count || 0) / pageSize),
+      totalPages: Math.ceil(totalCount / pageSize),
     }
   };
 }
@@ -148,6 +137,7 @@ export default async function TasksPage({ searchParams }: TasksPageProps) {
           <TaskListClient 
             initialTasks={tasks}
             totalCount={totalCount}
+            pagination={pagination}
             searchParams={resolvedSearchParams}
           />
         </div>

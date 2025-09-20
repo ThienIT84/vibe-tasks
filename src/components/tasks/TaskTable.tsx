@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useCallback, useMemo } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Task, TaskStatus, TaskPriority } from '@/types/task';
@@ -44,6 +44,7 @@ interface TaskTableProps {
     pageSize: number;
     totalPages: number;
   };
+  totalCount: number;
   searchParams: {
     q?: string;
     status?: TaskStatus;
@@ -54,10 +55,13 @@ interface TaskTableProps {
   };
 }
 
-export default function TaskTable({ tasks, setTasks, pagination, searchParams }: TaskTableProps) {
+export default function TaskTable({ tasks, setTasks, pagination, totalCount, searchParams }: TaskTableProps) {
   const router = useRouter();
   const [deletingTaskId, setDeletingTaskId] = useState<string | null>(null);
   const [updatingTaskId, setUpdatingTaskId] = useState<string | null>(null);
+
+  // Memoize pagination to prevent unnecessary re-renders
+  const memoizedPagination = useMemo(() => pagination, [pagination.page, pagination.pageSize, pagination.totalPages]);
 
   const getPriorityColor = (priority: TaskPriority) => {
     switch (priority) {
@@ -109,8 +113,21 @@ export default function TaskTable({ tasks, setTasks, pagination, searchParams }:
     }
   };
 
-  const handleStatusChange = async (taskId: string, newStatus: TaskStatus) => {
+  const handleStatusChange = useCallback(async (taskId: string, newStatus: TaskStatus) => {
     try {
+      console.log('TaskTable: Updating status', {
+        taskId,
+        newStatus,
+        currentPage: memoizedPagination.page,
+        searchParams: searchParams
+      });
+      
+      // Prevent any filter updates during task update
+      if (updatingTaskId) {
+        console.log('TaskTable: Already updating, skipping');
+        return;
+      }
+      
       setUpdatingTaskId(taskId);
       
       // Find the task to get current data
@@ -142,14 +159,21 @@ export default function TaskTable({ tasks, setTasks, pagination, searchParams }:
       
       if (data.task) {
         // Update the task in the local state immediately
-        setTasks(prevTasks => 
-          prevTasks.map(task => 
+        setTasks(prevTasks => {
+          const updatedTasks = prevTasks.map(task => 
             task.id === taskId 
               ? { ...task, status: newStatus, updated_at: data.task.updated_at }
               : task
-          )
-        );
-        toast.success('Task status updated successfully');
+          );
+          console.log('TaskTable: Status updated locally', {
+            taskId,
+            newStatus,
+            currentPage: memoizedPagination.page,
+            tasksCount: updatedTasks.length
+          });
+          return updatedTasks;
+        });
+        // toast.success('Task status updated successfully');
       }
     } catch (error) {
       console.error('Error updating task status:', error);
@@ -157,10 +181,23 @@ export default function TaskTable({ tasks, setTasks, pagination, searchParams }:
     } finally {
       setUpdatingTaskId(null);
     }
-  };
+  }, [tasks, memoizedPagination.page, searchParams, setTasks]);
 
-  const handlePriorityChange = async (taskId: string, newPriority: TaskPriority) => {
+  const handlePriorityChange = useCallback(async (taskId: string, newPriority: TaskPriority) => {
     try {
+      console.log('TaskTable: Updating priority', {
+        taskId,
+        newPriority,
+        currentPage: memoizedPagination.page,
+        searchParams: searchParams
+      });
+      
+      // Prevent any filter updates during task update
+      if (updatingTaskId) {
+        console.log('TaskTable: Already updating, skipping');
+        return;
+      }
+      
       setUpdatingTaskId(taskId);
       
       // Find the task to get current data
@@ -192,14 +229,21 @@ export default function TaskTable({ tasks, setTasks, pagination, searchParams }:
       
       if (data.task) {
         // Update the task in the local state immediately
-        setTasks(prevTasks => 
-          prevTasks.map(task => 
+        setTasks(prevTasks => {
+          const updatedTasks = prevTasks.map(task => 
             task.id === taskId 
               ? { ...task, priority: newPriority, updated_at: data.task.updated_at }
               : task
-          )
-        );
-        toast.success('Task priority updated successfully');
+          );
+          console.log('TaskTable: Priority updated locally', {
+            taskId,
+            newPriority,
+            currentPage: pagination.page,
+            tasksCount: updatedTasks.length
+          });
+          return updatedTasks;
+        });
+        // toast.success('Task priority updated successfully');
       }
     } catch (error) {
       console.error('Error updating task priority:', error);
@@ -207,7 +251,7 @@ export default function TaskTable({ tasks, setTasks, pagination, searchParams }:
     } finally {
       setUpdatingTaskId(null);
     }
-  };
+  }, [tasks, memoizedPagination.page, searchParams, setTasks]);
 
   const handleDelete = async (taskId: string) => {
     try {
@@ -222,8 +266,19 @@ export default function TaskTable({ tasks, setTasks, pagination, searchParams }:
         return;
       }
 
+      // Remove task from local state instead of refreshing
+      setTasks(prevTasks => {
+        const newTasks = prevTasks.filter(task => task.id !== taskId);
+        
+        // If current page becomes empty and we're not on page 1, go to previous page
+        if (newTasks.length === 0 && memoizedPagination.page > 1) {
+          const prevPage = memoizedPagination.page - 1;
+          updateUrl({ page: prevPage.toString() });
+        }
+        
+        return newTasks;
+      });
       toast.success('Task deleted successfully');
-      router.refresh();
     } catch (error) {
       toast.error('An unexpected error occurred');
     } finally {
@@ -249,11 +304,17 @@ export default function TaskTable({ tasks, setTasks, pagination, searchParams }:
     });
 
     const newUrl = `/tasks?${params.toString()}`;
-    router.push(newUrl);
+    router.replace(newUrl); // Use replace instead of push to avoid adding to history
   };
 
   const goToPage = (page: number) => {
     updateUrl({ page: page.toString() });
+  };
+
+  // Prevent page reset when updating tasks
+  const preventPageReset = () => {
+    // This function can be called to prevent any automatic page resets
+    // Currently, all updates are handled locally without page resets
   };
 
   if (tasks.length === 0) {
@@ -432,30 +493,30 @@ export default function TaskTable({ tasks, setTasks, pagination, searchParams }:
       </div>
 
       {/* Pagination */}
-      {pagination.totalPages > 1 && (
+      {memoizedPagination.totalPages > 1 && (
         <div className="flex items-center justify-between">
           <div className="text-sm text-gray-600">
-            Showing {((pagination.page - 1) * pagination.pageSize) + 1} to{' '}
-            {Math.min(pagination.page * pagination.pageSize, tasks.length)} of{' '}
-            {pagination.totalPages * pagination.pageSize} results
+            Showing {((memoizedPagination.page - 1) * memoizedPagination.pageSize) + 1} to{' '}
+            {Math.min(memoizedPagination.page * memoizedPagination.pageSize, totalCount)} of{' '}
+            {totalCount} results
           </div>
           <div className="flex items-center gap-2">
             <Button
               variant="outline"
               size="sm"
-              onClick={() => goToPage(pagination.page - 1)}
-              disabled={pagination.page <= 1}
+              onClick={() => goToPage(memoizedPagination.page - 1)}
+              disabled={memoizedPagination.page <= 1}
             >
               <ChevronLeft className="h-4 w-4" />
               Previous
             </Button>
             <div className="flex items-center gap-1">
-              {Array.from({ length: Math.min(5, pagination.totalPages) }, (_, i) => {
+              {Array.from({ length: Math.min(5, memoizedPagination.totalPages) }, (_, i) => {
                 const pageNum = i + 1;
                 return (
                   <Button
                     key={pageNum}
-                    variant={pagination.page === pageNum ? "default" : "outline"}
+                    variant={memoizedPagination.page === pageNum ? "default" : "outline"}
                     size="sm"
                     onClick={() => goToPage(pageNum)}
                     className="w-8 h-8 p-0"
@@ -468,8 +529,8 @@ export default function TaskTable({ tasks, setTasks, pagination, searchParams }:
             <Button
               variant="outline"
               size="sm"
-              onClick={() => goToPage(pagination.page + 1)}
-              disabled={pagination.page >= pagination.totalPages}
+              onClick={() => goToPage(memoizedPagination.page + 1)}
+              disabled={memoizedPagination.page >= memoizedPagination.totalPages}
             >
               Next
               <ChevronRight className="h-4 w-4" />

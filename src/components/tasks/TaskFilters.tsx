@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -12,7 +12,7 @@ import {
   SelectValue 
 } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
-import { Search, X, RotateCcw } from 'lucide-react';
+import { Search, X, RotateCcw, Loader2 } from 'lucide-react';
 import { TaskStatus, TaskPriority } from '@/types/task';
 
 interface TaskFiltersProps {
@@ -30,24 +30,47 @@ export default function TaskFilters({ searchParams }: TaskFiltersProps) {
   const router = useRouter();
   const [searchQuery, setSearchQuery] = useState(searchParams.q || '');
   const [debouncedQuery, setDebouncedQuery] = useState(searchParams.q || '');
+  const [isLoading, setIsLoading] = useState(false);
+  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Debounce search input
+  // Debounce search input to reduce requests
   useEffect(() => {
-    const timer = setTimeout(() => {
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current);
+    }
+    
+    timeoutRef.current = setTimeout(() => {
       setDebouncedQuery(searchQuery);
-    }, 500);
+    }, 300); // Reduced from 500ms to 300ms
 
-    return () => clearTimeout(timer);
+    return () => {
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+      }
+    };
   }, [searchQuery]);
 
-  // Update URL when debounced query changes
-  useEffect(() => {
-    if (debouncedQuery !== searchParams.q) {
-      updateUrl({ q: debouncedQuery || undefined, page: undefined });
-    }
-  }, [debouncedQuery]);
-
   const updateUrl = useCallback((newParams: Record<string, string | undefined>) => {
+    console.log('TaskFilters: updateUrl called', {
+      newParams,
+      currentSearchParams: searchParams,
+      currentPage: searchParams.page
+    });
+    
+    // Check if params actually changed to avoid unnecessary requests
+    const hasChanges = Object.entries(newParams).some(([key, value]) => {
+      const currentValue = searchParams[key as keyof typeof searchParams];
+      return currentValue !== value;
+    });
+    
+    if (!hasChanges) {
+      console.log('TaskFilters: No changes detected, skipping update');
+      return;
+    }
+    
+    console.log('TaskFilters: Changes detected, updating URL');
+    setIsLoading(true);
+    
     const params = new URLSearchParams();
     
     // Keep existing params
@@ -65,40 +88,78 @@ export default function TaskFilters({ searchParams }: TaskFiltersProps) {
     });
 
     const newUrl = `/tasks?${params.toString()}`;
-    router.push(newUrl);
+    router.replace(newUrl);
+    
+    // Reset loading state after navigation
+    setTimeout(() => setIsLoading(false), 100);
   }, [searchParams, router]);
 
+  // Update URL when debounced query changes
+  useEffect(() => {
+    if (debouncedQuery !== searchParams.q) {
+      // Only reset to page 1 if there's an actual search query change
+      const hasSearchQuery = debouncedQuery && debouncedQuery.trim() !== '';
+      const hadSearchQuery = searchParams.q && searchParams.q.trim() !== '';
+      
+      // Only reset page if we're going from no search to search, or search to different search
+      if (hasSearchQuery || hadSearchQuery) {
+        updateUrl({ q: debouncedQuery || undefined, page: '1' });
+      } else {
+        // If clearing search, don't reset page
+        updateUrl({ q: debouncedQuery || undefined });
+      }
+    }
+  }, [debouncedQuery, searchParams.q, updateUrl]);
+
+  // Reset loading state when searchParams change (data loaded)
+  useEffect(() => {
+    setIsLoading(false);
+  }, [searchParams]);
+
+  // Reset loading state on component mount
+  useEffect(() => {
+    setIsLoading(false);
+  }, []);
+
   const handleStatusChange = (status: string) => {
+    console.log('TaskFilters: handleStatusChange called', {
+      status,
+      currentPage: searchParams.page,
+      searchParams: searchParams
+    });
     updateUrl({ 
       status: status === 'all' ? undefined : status as TaskStatus,
-      page: undefined 
+      page: '1' // Reset to page 1 when filtering
     });
   };
 
   const handlePriorityChange = (priority: string) => {
     updateUrl({ 
       priority: priority === 'all' ? undefined : priority as TaskPriority,
-      page: undefined 
+      page: '1' // Reset to page 1 when filtering
     });
   };
 
   const handleSortChange = (sort: string) => {
     updateUrl({ 
       sort: sort === 'inserted_at' ? undefined : sort,
-      page: undefined 
+      page: '1' // Reset to page 1 when sorting
     });
   };
 
   const handleDirChange = (dir: string) => {
     updateUrl({ 
       dir: dir === 'desc' ? undefined : dir as 'asc' | 'desc',
-      page: undefined 
+      page: '1' // Reset to page 1 when changing direction
     });
   };
 
   const clearFilters = () => {
     setSearchQuery('');
-    router.push('/tasks');
+    setIsLoading(true);
+    router.replace('/tasks');
+    // Reset loading state after navigation
+    setTimeout(() => setIsLoading(false), 100);
   };
 
   const hasActiveFilters = searchParams.q || searchParams.status || searchParams.priority || 
@@ -114,7 +175,11 @@ export default function TaskFilters({ searchParams }: TaskFiltersProps) {
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
           className="pl-10 pr-4"
+          disabled={isLoading}
         />
+        {isLoading && (
+          <Loader2 className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4 animate-spin" />
+        )}
       </div>
 
       {/* Filters Row */}
@@ -125,6 +190,7 @@ export default function TaskFilters({ searchParams }: TaskFiltersProps) {
           <Select
             value={searchParams.status || 'all'}
             onValueChange={handleStatusChange}
+            disabled={isLoading}
           >
             <SelectTrigger className="w-40">
               <SelectValue placeholder="All Status" />
@@ -145,6 +211,7 @@ export default function TaskFilters({ searchParams }: TaskFiltersProps) {
           <Select
             value={searchParams.priority || 'all'}
             onValueChange={handlePriorityChange}
+            disabled={isLoading}
           >
             <SelectTrigger className="w-40">
               <SelectValue placeholder="All Priority" />
@@ -165,6 +232,7 @@ export default function TaskFilters({ searchParams }: TaskFiltersProps) {
           <Select
             value={searchParams.sort || 'inserted_at'}
             onValueChange={handleSortChange}
+            disabled={isLoading}
           >
             <SelectTrigger className="w-40">
               <SelectValue placeholder="Sort by" />
@@ -186,6 +254,7 @@ export default function TaskFilters({ searchParams }: TaskFiltersProps) {
           <Select
             value={searchParams.dir || 'desc'}
             onValueChange={handleDirChange}
+            disabled={isLoading}
           >
             <SelectTrigger className="w-32">
               <SelectValue placeholder="Order" />
@@ -204,6 +273,7 @@ export default function TaskFilters({ searchParams }: TaskFiltersProps) {
             size="sm"
             onClick={clearFilters}
             className="ml-auto"
+            disabled={isLoading}
           >
             <RotateCcw className="h-4 w-4 mr-2" />
             Clear Filters
