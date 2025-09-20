@@ -35,6 +35,7 @@ import {
 import { supabase } from '@/lib/supabase';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
+import { useBroadcastChannel } from '@/lib/hooks/broadcast';
 
 interface TaskTableProps {
   tasks: Task[];
@@ -59,6 +60,9 @@ export default function TaskTable({ tasks, setTasks, pagination, totalCount, sea
   const router = useRouter();
   const [deletingTaskId, setDeletingTaskId] = useState<string | null>(null);
   const [updatingTaskId, setUpdatingTaskId] = useState<string | null>(null);
+
+  // Broadcast changes to other tabs
+  const { broadcastTaskStatusChanged, broadcastTaskPriorityChanged, broadcastTaskDeleted } = useBroadcastChannel('vibe-tasks-sync');
 
   // Memoize pagination to prevent unnecessary re-renders
   const memoizedPagination = useMemo(() => pagination, [pagination.page, pagination.pageSize, pagination.totalPages]);
@@ -88,9 +92,22 @@ export default function TaskTable({ tasks, setTasks, pagination, totalCount, sea
 
   const isOverdue = (dueDate: string | null) => {
     if (!dueDate) return false;
-    const due = new Date(dueDate);
-    const now = new Date();
-    return due < now;
+    // Use local timezone to match user's actual date
+    const today = new Date();
+    const todayStr = today.getFullYear() + '-' + 
+      String(today.getMonth() + 1).padStart(2, '0') + '-' + 
+      String(today.getDate()).padStart(2, '0');
+    return dueDate < todayStr;
+  };
+
+  const isDueToday = (dueDate: string | null) => {
+    if (!dueDate) return false;
+    // Use local timezone to match user's actual date
+    const today = new Date();
+    const todayStr = today.getFullYear() + '-' + 
+      String(today.getMonth() + 1).padStart(2, '0') + '-' + 
+      String(today.getDate()).padStart(2, '0');
+    return dueDate === todayStr;
   };
 
   const formatDueDate = (dueDate: string | null) => {
@@ -173,6 +190,9 @@ export default function TaskTable({ tasks, setTasks, pagination, totalCount, sea
           });
           return updatedTasks;
         });
+        // Broadcast status change to other tabs
+        console.log('TaskTable: Broadcasting status change', { taskId, newStatus });
+        broadcastTaskStatusChanged(taskId, newStatus);
         // toast.success('Task status updated successfully');
       }
     } catch (error) {
@@ -243,6 +263,9 @@ export default function TaskTable({ tasks, setTasks, pagination, totalCount, sea
           });
           return updatedTasks;
         });
+        // Broadcast priority change to other tabs
+        console.log('TaskTable: Broadcasting priority change', { taskId, newPriority });
+        broadcastTaskPriorityChanged(taskId, newPriority);
         // toast.success('Task priority updated successfully');
       }
     } catch (error) {
@@ -278,6 +301,9 @@ export default function TaskTable({ tasks, setTasks, pagination, totalCount, sea
         
         return newTasks;
       });
+      // Broadcast task deletion to other tabs
+      console.log('TaskTable: Broadcasting task deletion', { taskId });
+      broadcastTaskDeleted(taskId);
       toast.success('Task deleted successfully');
     } catch (error) {
       toast.error('An unexpected error occurred');
@@ -351,18 +377,8 @@ export default function TaskTable({ tasks, setTasks, pagination, totalCount, sea
             {tasks.map((task) => (
               <tr key={task.id} className="border-b hover:bg-gray-50">
                 <td className="py-3 pr-4">
-                  <div className="flex items-center gap-2 max-w-[200px]">
-                    <div className="font-medium text-gray-900 truncate">
-                      {task.title}
-                    </div>
-                    <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
-                      task.priority === 'urgent' ? 'bg-red-100 text-red-800' :
-                      task.priority === 'high' ? 'bg-orange-100 text-orange-800' :
-                      task.priority === 'medium' ? 'bg-yellow-100 text-yellow-800' :
-                      'bg-green-100 text-green-800'
-                    }`}>
-                      {task.priority.charAt(0).toUpperCase() + task.priority.slice(1)}
-                    </span>
+                  <div className="font-medium text-gray-900 max-w-[200px] truncate">
+                    {task.title}
                   </div>
                 </td>
                 <td className="py-3 pr-4">
@@ -426,7 +442,12 @@ export default function TaskTable({ tasks, setTasks, pagination, totalCount, sea
                             Overdue
                           </Badge>
                         )}
-                        {isDueSoon(task.due_date) && !isOverdue(task.due_date) && (
+                        {isDueToday(task.due_date) && !isOverdue(task.due_date) && (
+                          <Badge variant="default" className="text-xs px-2 py-0.5 bg-orange-500 hover:bg-orange-600">
+                            Due Today
+                          </Badge>
+                        )}
+                        {isDueSoon(task.due_date) && !isOverdue(task.due_date) && !isDueToday(task.due_date) && (
                           <Badge variant="outline" className="text-xs px-2 py-0.5 border-orange-200 text-orange-700 bg-orange-50">
                             Due Soon
                           </Badge>

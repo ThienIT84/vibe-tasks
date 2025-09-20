@@ -126,9 +126,22 @@ export default function TaskDetail({ task, onTaskUpdate }: TaskDetailProps) {
 
   const isOverdue = (dueDate: string | null) => {
     if (!dueDate || !isMounted) return false;
-    const due = new Date(dueDate);
-    const now = new Date();
-    return due < now;
+    // Use local timezone to match user's actual date
+    const today = new Date();
+    const todayStr = today.getFullYear() + '-' + 
+      String(today.getMonth() + 1).padStart(2, '0') + '-' + 
+      String(today.getDate()).padStart(2, '0');
+    return dueDate < todayStr;
+  };
+
+  const isDueToday = (dueDate: string | null) => {
+    if (!dueDate || !isMounted) return false;
+    // Use local timezone to match user's actual date
+    const today = new Date();
+    const todayStr = today.getFullYear() + '-' + 
+      String(today.getMonth() + 1).padStart(2, '0') + '-' + 
+      String(today.getDate()).padStart(2, '0');
+    return dueDate === todayStr;
   };
 
   const handleStatusChange = async (newStatus: TaskStatus) => {
@@ -283,7 +296,12 @@ export default function TaskDetail({ task, onTaskUpdate }: TaskDetailProps) {
                           Overdue
                         </Badge>
                       )}
-                      {isDueSoon(task.due_date) && !isOverdue(task.due_date) && (
+                      {isDueToday(task.due_date) && !isOverdue(task.due_date) && (
+                        <Badge variant="default" className="text-xs px-2 py-0.5 bg-orange-500 hover:bg-orange-600">
+                          Due Today
+                        </Badge>
+                      )}
+                      {isDueSoon(task.due_date) && !isOverdue(task.due_date) && !isDueToday(task.due_date) && (
                         <Badge variant="outline" className="text-xs px-2 py-0.5 border-orange-200 text-orange-700 bg-orange-50">
                           Due Soon
                         </Badge>

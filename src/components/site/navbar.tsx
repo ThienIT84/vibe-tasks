@@ -1,13 +1,20 @@
 'use client'
 import Link from "next/link"
-import { usePathname } from "next/navigation"
+import { usePathname, useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
-import { Menu, X, Home, BarChart3, LogIn, User, CheckSquare } from "lucide-react"
-import { useState } from "react"
+import { Menu, X, Home, BarChart3, LogIn, User, CheckSquare, LogOut } from "lucide-react"
+import { useState, useEffect } from "react"
+import { supabase } from "@/lib/supabase"
+import { toast } from "sonner"
+import TasksToday from "@/components/tasks/TasksToday"
 
 export default function Navbar() {
   const pathname = usePathname()
+  const router = useRouter()
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
+  const [isAuthenticated, setIsAuthenticated] = useState(false)
+  const [isSigningOut, setIsSigningOut] = useState(false)
+  const [isMounted, setIsMounted] = useState(false)
 
   const navigation = [
     { name: 'Home', href: '/', icon: Home },
@@ -21,6 +28,50 @@ export default function Navbar() {
       return pathname === '/'
     }
     return pathname.startsWith(href)
+  }
+
+  // Check authentication status
+  useEffect(() => {
+    const checkAuth = async () => {
+      try {
+        const { data: { user } } = await supabase.auth.getUser()
+        setIsAuthenticated(!!user)
+      } catch (error) {
+        console.error('Error checking auth status:', error)
+        setIsAuthenticated(false)
+      } finally {
+        setIsMounted(true)
+      }
+    }
+
+    checkAuth()
+
+    // Listen for auth changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      setIsAuthenticated(!!session?.user)
+    })
+
+    return () => subscription.unsubscribe()
+  }, [])
+
+  // Handle sign out
+  const handleSignOut = async () => {
+    try {
+      setIsSigningOut(true)
+      const { error } = await supabase.auth.signOut()
+      if (error) {
+        console.error('Error signing out:', error)
+        toast.error('Failed to sign out')
+        return
+      }
+      toast.success('Signed out successfully')
+      router.push('/')
+    } catch (error) {
+      console.error('Error signing out:', error)
+      toast.error('Failed to sign out')
+    } finally {
+      setIsSigningOut(false)
+    }
   }
 
   return (
@@ -54,20 +105,46 @@ export default function Navbar() {
             })}
           </nav>
 
-          {/* Desktop Auth */}
+          {/* Desktop Tasks Today & Auth */}
           <div className="hidden md:flex items-center gap-2">
-            <Link href="/sign-in">
-              <Button variant="ghost" size="sm" className="flex items-center gap-2">
-                <LogIn className="h-4 w-4" />
-                Sign In
+            {isMounted && isAuthenticated && (
+              <TasksToday />
+            )}
+            {!isMounted ? (
+              // Loading state
+              <div className="flex items-center gap-2">
+                <div className="h-8 w-16 bg-gray-200 rounded animate-pulse"></div>
+                <div className="h-8 w-16 bg-gray-200 rounded animate-pulse"></div>
+              </div>
+            ) : isAuthenticated ? (
+              // Signed in - show sign out
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleSignOut}
+                disabled={isSigningOut}
+                className="flex items-center gap-2"
+              >
+                <LogOut className="h-4 w-4" />
+                {isSigningOut ? "Signing Out..." : "Sign Out"}
               </Button>
-            </Link>
-            <Link href="/sign-up">
-              <Button size="sm" className="flex items-center gap-2">
-                <User className="h-4 w-4" />
-                Sign Up
-              </Button>
-            </Link>
+            ) : (
+              // Not signed in - show sign in/up
+              <>
+                <Link href="/sign-in">
+                  <Button variant="ghost" size="sm" className="flex items-center gap-2">
+                    <LogIn className="h-4 w-4" />
+                    Sign In
+                  </Button>
+                </Link>
+                <Link href="/sign-up">
+                  <Button size="sm" className="flex items-center gap-2">
+                    <User className="h-4 w-4" />
+                    Sign Up
+                  </Button>
+                </Link>
+              </>
+            )}
           </div>
 
           {/* Mobile menu button */}
@@ -108,19 +185,51 @@ export default function Navbar() {
                   </Link>
                 )
               })}
+              {/* Mobile Tasks Today */}
+              {isMounted && isAuthenticated && (
+                <div className="pt-2 border-t">
+                  <TasksToday className="w-full" />
+                </div>
+              )}
               <div className="pt-2 border-t space-y-1">
-                <Link href="/sign-in" onClick={() => setIsMobileMenuOpen(false)}>
-                  <Button variant="ghost" size="sm" className="w-full justify-start flex items-center gap-2">
-                    <LogIn className="h-4 w-4" />
-                    Sign In
+                {!isMounted ? (
+                  // Loading state
+                  <div className="space-y-1">
+                    <div className="h-8 w-full bg-gray-200 rounded animate-pulse"></div>
+                    <div className="h-8 w-full bg-gray-200 rounded animate-pulse"></div>
+                  </div>
+                ) : isAuthenticated ? (
+                  // Signed in - show sign out
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => {
+                      handleSignOut()
+                      setIsMobileMenuOpen(false)
+                    }}
+                    disabled={isSigningOut}
+                    className="w-full justify-start flex items-center gap-2"
+                  >
+                    <LogOut className="h-4 w-4" />
+                    {isSigningOut ? "Signing Out..." : "Sign Out"}
                   </Button>
-                </Link>
-                <Link href="/sign-up" onClick={() => setIsMobileMenuOpen(false)}>
-                  <Button size="sm" className="w-full justify-start flex items-center gap-2">
-                    <User className="h-4 w-4" />
-                    Sign Up
-                  </Button>
-                </Link>
+                ) : (
+                  // Not signed in - show sign in/up
+                  <>
+                    <Link href="/sign-in" onClick={() => setIsMobileMenuOpen(false)}>
+                      <Button variant="ghost" size="sm" className="w-full justify-start flex items-center gap-2">
+                        <LogIn className="h-4 w-4" />
+                        Sign In
+                      </Button>
+                    </Link>
+                    <Link href="/sign-up" onClick={() => setIsMobileMenuOpen(false)}>
+                      <Button size="sm" className="w-full justify-start flex items-center gap-2">
+                        <User className="h-4 w-4" />
+                        Sign Up
+                      </Button>
+                    </Link>
+                  </>
+                )}
               </div>
             </div>
           </div>

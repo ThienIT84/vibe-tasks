@@ -1,10 +1,12 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
+import { useRouter } from 'next/navigation';
 import TaskTable from './TaskTable';
 import TaskFilters from './TaskFilters';
 import TaskListSkeleton from './TaskListSkeleton';
 import { Task, TaskStatus, TaskPriority } from '@/types/task';
+import { useBroadcastChannel, type BroadcastMessage } from '@/lib/hooks/broadcast';
 
 interface TaskListClientProps {
   initialTasks: Task[];
@@ -33,6 +35,41 @@ export default function TaskListClient({
   const [tasks, setTasks] = useState<Task[]>(initialTasks);
   const [isLoading, setIsLoading] = useState(false);
   const [currentPage, setCurrentPage] = useState(parseInt(searchParams.page || '1'));
+  const router = useRouter();
+
+  // Handle cross-tab communication
+  const handleBroadcastMessage = useCallback((message: BroadcastMessage) => {
+    console.log('TaskListClient received broadcast message:', message);
+    
+    switch (message.type) {
+      case 'TASK_CREATED':
+        console.log('TaskListClient: New task created, refreshing page');
+        // Refresh the page to get new data from server
+        router.refresh();
+        break;
+      case 'TASK_UPDATED':
+        console.log('TaskListClient: Task updated, refreshing page');
+        router.refresh();
+        break;
+      case 'TASK_DELETED':
+        console.log('TaskListClient: Task deleted, refreshing page');
+        router.refresh();
+        break;
+      case 'TASK_STATUS_CHANGED':
+        console.log('TaskListClient: Task status changed, refreshing page');
+        router.refresh();
+        break;
+      case 'TASK_PRIORITY_CHANGED':
+        console.log('TaskListClient: Task priority changed, refreshing page');
+        router.refresh();
+        break;
+    }
+  }, [router]);
+
+  const { broadcastTaskCreated, broadcastTaskUpdated, broadcastTaskDeleted } = useBroadcastChannel(
+    'vibe-tasks-sync',
+    handleBroadcastMessage
+  );
 
   // Update tasks when searchParams change (from server-side)
   useEffect(() => {
