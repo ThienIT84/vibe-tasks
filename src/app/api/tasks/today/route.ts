@@ -1,37 +1,62 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createRouteHandlerSupabaseClient } from '@/lib/supabase-route-handler';
+import { createServerClient } from '@supabase/ssr';
 
 export async function GET(request: NextRequest) {
   try {
-    const supabase = await createRouteHandlerSupabaseClient();
+    // Debug cookies
+    console.log('Request cookies:', request.cookies.getAll().map(c => ({ name: c.name, value: c.value.substring(0, 20) + '...' })));
+    
+    const supabase = createServerClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+      {
+        cookies: {
+          getAll() {
+            return request.cookies.getAll();
+          },
+          setAll() {
+            // No-op in route handlers
+          },
+        },
+      }
+    );
 
     // Check authentication
     const { data: { user }, error: authError } = await supabase.auth.getUser();
     
-    if (authError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    console.log('Auth check result:', { user: user?.id, error: authError?.message });
+    
+    if (authError) {
+      console.error('Auth error:', authError);
+      return NextResponse.json({ error: 'Authentication error', details: authError.message }, { status: 401 });
+    }
+    
+    if (!user) {
+      console.log('No user found in session');
+      return NextResponse.json({ error: 'Unauthorized - no user session' }, { status: 401 });
     }
 
-    // Get today's date (start of day in local timezone)
-    const today = new Date();
-    const startOfToday = new Date(today.getFullYear(), today.getMonth(), today.getDate());
-    const startOfTomorrow = new Date(today.getFullYear(), today.getMonth(), today.getDate() + 1);
-
-    // Format dates as YYYY-MM-DD for comparison
-    const todayStr = startOfToday.toISOString().split('T')[0];
-    const tomorrowStr = startOfTomorrow.toISOString().split('T')[0];
+    // Get today's date in local timezone
+    const now = new Date();
+    const todayStr = now.toLocaleDateString('en-CA'); // YYYY-MM-DD format
+    const tomorrow = new Date(now);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    const tomorrowStr = tomorrow.toLocaleDateString('en-CA');
     
-    // For testing: also include tomorrow's tasks
-    const dayAfterTomorrow = new Date(today.getFullYear(), today.getMonth(), today.getDate() + 2);
-    const dayAfterTomorrowStr = dayAfterTomorrow.toISOString().split('T')[0];
+    console.log('Date comparison:', {
+      today: todayStr,
+      tomorrow: tomorrowStr,
+      currentTime: new Date().toISOString(),
+      currentDate: new Date().toDateString(),
+      timezone: Intl.DateTimeFormat().resolvedOptions().timeZone
+    });
 
     console.log('=== TODAY TASKS API DEBUG ===');
     console.log('User ID:', user.id);
     console.log('Today range:', {
       todayStr,
       tomorrowStr,
-      startOfToday: startOfToday.toISOString(),
-      startOfTomorrow: startOfTomorrow.toISOString()
+      currentTime: new Date().toISOString()
     });
 
     // First, let's check all tasks for this user
@@ -63,17 +88,19 @@ export async function GET(request: NextRequest) {
       tasks: tasksWithTodayDueDate
     });
 
-    // Get tasks due today and tomorrow (for testing)
+    // Get tasks due today (not completed)
     const { data: tasks, error } = await supabase
       .from('tasks')
       .select('*')
       .eq('user_id', user.id)
-      .in('due_date', [todayStr, tomorrowStr])  // Include today and tomorrow
+      .eq('due_date', todayStr)
+      .neq('status', 'done')
       .order('due_date', { ascending: true });
 
     console.log('Due today tasks query result:', {
       count: tasks?.length || 0,
-      tasks: tasks?.map(t => ({ id: t.id, title: t.title, due_date: t.due_date }))
+      tasks: tasks?.map(t => ({ id: t.id, title: t.title, due_date: t.due_date })),
+      queryCondition: `due_date = '${todayStr}'`
     });
 
     // Get overdue tasks (due before today and not completed)
@@ -82,7 +109,7 @@ export async function GET(request: NextRequest) {
       .select('*')
       .eq('user_id', user.id)
       .lt('due_date', todayStr)
-      .in('status', ['pending', 'in_progress'])
+      .neq('status', 'done')
       .order('due_date', { ascending: true });
 
     console.log('Overdue tasks query result:', {
@@ -100,28 +127,8 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Failed to fetch overdue tasks' }, { status: 500 });
     }
 
-    // Also get tasks without due_date that are pending/in_progress (for today's work)
-    const { data: workTasks, error: workError } = await supabase
-      .from('tasks')
-      .select('*')
-      .eq('user_id', user.id)
-      .in('status', ['pending', 'in_progress'])
-      .is('due_date', null)
-      .order('inserted_at', { ascending: false })
-      .limit(5); // Limit to 5 most recent tasks without due date
-
-    console.log('Work tasks query result:', {
-      count: workTasks?.length || 0,
-      tasks: workTasks?.map(t => ({ id: t.id, title: t.title, due_date: t.due_date }))
-    });
-
-    if (workError) {
-      console.error('Error fetching work tasks:', workError);
-      return NextResponse.json({ error: 'Failed to fetch work tasks', details: workError.message }, { status: 500 });
-    }
-
-    // Combine and deduplicate tasks
-    const allTasks = [...(overdueTasks || []), ...(tasks || []), ...(workTasks || [])];
+    // Combine tasks
+    const allTasks = [...(overdueTasks || []), ...(tasks || [])];
     const uniqueTasks = allTasks.filter((task, index, self) => 
       index === self.findIndex(t => t.id === task.id)
     );
@@ -130,17 +137,28 @@ export async function GET(request: NextRequest) {
     const todayTasks = {
       overdue: overdueTasks || [],
       dueToday: tasks || [],
-      workTasks: workTasks || [],
-      allTasks: uniqueTasks,
       totalCount: uniqueTasks.length
     };
 
     console.log('Tasks categorized:', {
       overdue: todayTasks.overdue.length,
       dueToday: todayTasks.dueToday.length,
-      workTasks: todayTasks.workTasks.length,
       total: todayTasks.totalCount
     });
+
+    // Debug: Log individual tasks
+    console.log('Overdue tasks details:', todayTasks.overdue.map(t => ({ 
+      id: t.id, 
+      title: t.title, 
+      due_date: t.due_date, 
+      status: t.status 
+    })));
+    console.log('Due today tasks details:', todayTasks.dueToday.map(t => ({ 
+      id: t.id, 
+      title: t.title, 
+      due_date: t.due_date, 
+      status: t.status 
+    })));
 
     return NextResponse.json({ tasks: todayTasks });
   } catch (error) {
