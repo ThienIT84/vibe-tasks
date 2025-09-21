@@ -4,7 +4,7 @@ import { usePathname, useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Menu, X, Home, BarChart3, LogIn, User, CheckSquare, LogOut } from "lucide-react"
 import { useState, useEffect } from "react"
-import { supabase } from "@/lib/supabase"
+import { supabase } from "@/lib/supabase-browser"
 import { toast } from "sonner"
 import TasksToday from "@/components/tasks/TasksToday"
 

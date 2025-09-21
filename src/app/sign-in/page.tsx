@@ -2,7 +2,7 @@
 import { useState } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
-import { supabase } from "@/lib/supabase"
+import { supabase } from "@/lib/supabase-browser"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -52,6 +52,8 @@ export default function SignInPage() {
       }
 
       if (data?.user) {
+        console.log('Sign in successful, user:', data.user.id);
+        console.log('Session:', data.session);
         toast.success("Signed in successfully!")
         router.push("/dashboard")
       }

@@ -1,7 +1,7 @@
 'use client'
 import { useState, useEffect, useRef, useCallback } from "react"
 import { useRouter } from "next/navigation"
-import { supabase } from "@/lib/supabase"
+import { supabase } from "@/lib/supabase-browser"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog"
@@ -43,11 +43,25 @@ export default function Dashboard() {
   const [isRefreshingCounts, setIsRefreshingCounts] = useState(false)
   const [isMounted, setIsMounted] = useState(false)
   const [showAnalytics, setShowAnalytics] = useState(false)
+  const [testResult, setTestResult] = useState<any>(null)
   const router = useRouter()
   const hasInitializedRef = useRef(false)
   const isFetchingCountsRef = useRef(false)
   const fetchTaskCountsRef = useRef<((showRefreshIndicator?: boolean) => Promise<void>) | undefined>(undefined)
   const fetchTasksRef = useRef<(() => Promise<void>) | undefined>(undefined)
+
+  // Test session function
+  const testSession = async () => {
+    try {
+      const response = await fetch('/api/test-session');
+      const data = await response.json();
+      setTestResult(data);
+      console.log('Test session result:', data);
+    } catch (error) {
+      console.error('Test session error:', error);
+      setTestResult({ error: error instanceof Error ? error.message : 'Unknown error' });
+    }
+  };
 
   // Handle cross-tab communication
   const handleBroadcastMessage = useCallback((message: BroadcastMessage) => {
@@ -105,9 +119,12 @@ export default function Dashboard() {
     hasInitializedRef.current = true
     const fetchUserProfile = async () => {
       try {
-        const { data: { user } } = await supabase.auth.getUser()
+        const { data: { user }, error: userError } = await supabase.auth.getUser()
+        
+        console.log('Dashboard: User check result:', { user: user?.id, error: userError?.message });
         
         if (!user) {
+          console.log('Dashboard: No user found, redirecting to sign-in');
           router.push('/sign-in')
           return
         }
@@ -450,6 +467,12 @@ export default function Dashboard() {
             Refresh
           </Button>
           <Button 
+            variant="outline" 
+            onClick={testSession}
+          >
+            Test Session
+          </Button>
+          <Button 
             variant={showAnalytics ? "default" : "outline"}
             onClick={() => setShowAnalytics(!showAnalytics)}
           >
@@ -488,6 +511,16 @@ export default function Dashboard() {
           </Dialog>
         </div>
       </div>
+
+      {/* Test Session Result */}
+      {testResult && (
+        <div className="bg-gray-100 p-4 rounded-lg">
+          <h3 className="font-semibold mb-2">Test Session Result:</h3>
+          <pre className="text-sm overflow-auto">
+            {JSON.stringify(testResult, null, 2)}
+          </pre>
+        </div>
+      )}
 
       {/* User Profile */}
       {userProfile && (

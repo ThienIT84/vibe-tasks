@@ -19,12 +19,11 @@ import { toast } from 'sonner';
 import { Task, TaskStatus, TaskPriority } from '@/types/task';
 import { useRouter } from 'next/navigation';
 import { useBroadcastChannel, type BroadcastMessage } from '@/lib/hooks/broadcast';
+import { supabase } from '@/lib/supabase-browser';
 
 interface TasksTodayData {
   overdue: Task[];
   dueToday: Task[];
-  workTasks: Task[];
-  allTasks: Task[];
   totalCount: number;
 }
 
@@ -44,7 +43,26 @@ export default function TasksToday({ className = '' }: TasksTodayProps) {
     try {
       console.log('TasksToday: Starting to fetch tasks...');
       setIsLoading(true);
-      const response = await fetch('/api/tasks/today');
+      
+      // Check if we have a session first
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      console.log('TasksToday: Current session:', session ? 'exists' : 'none');
+      console.log('TasksToday: Session error:', sessionError);
+      console.log('TasksToday: Session details:', session);
+      
+      // If no session, try to refresh it
+      if (!session && !sessionError) {
+        console.log('TasksToday: No session found, trying to refresh...');
+        const { data: { session: refreshedSession }, error: refreshError } = await supabase.auth.refreshSession();
+        console.log('TasksToday: Refresh result:', refreshedSession ? 'success' : 'failed', refreshError);
+      }
+      
+      const response = await fetch('/api/tasks/today', {
+        credentials: 'include', // Ensure cookies are sent
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
       console.log('TasksToday: Response status:', response.status);
       
       if (!response.ok) {
@@ -99,6 +117,19 @@ export default function TasksToday({ className = '' }: TasksTodayProps) {
       fetchTodayTasks();
     }
   }, [isMounted, fetchTodayTasks]);
+
+  // Debug: Log component state
+  useEffect(() => {
+    console.log('TasksToday: Component state:', {
+      isMounted,
+      isLoading,
+      tasks: tasks ? {
+        totalCount: tasks.totalCount,
+        overdue: tasks.overdue.length,
+        dueToday: tasks.dueToday.length
+      } : null
+    });
+  }, [isMounted, isLoading, tasks]);
 
   const getPriorityColor = (priority: TaskPriority) => {
     switch (priority) {
@@ -198,7 +229,20 @@ export default function TasksToday({ className = '' }: TasksTodayProps) {
 
       toast.success('Task marked as done!');
       
-      // Refresh tasks to show updated status
+      // Remove task from local state immediately
+      if (tasks) {
+        setTasks(prev => {
+          if (!prev) return prev;
+          return {
+            ...prev,
+            overdue: prev.overdue.filter(t => t.id !== taskId),
+            dueToday: prev.dueToday.filter(t => t.id !== taskId),
+            totalCount: prev.totalCount - 1
+          };
+        });
+      }
+      
+      // Refresh tasks to get updated data
       fetchTodayTasks();
     } catch (error) {
       console.error('Error marking task as done:', error);
@@ -207,6 +251,7 @@ export default function TasksToday({ className = '' }: TasksTodayProps) {
   };
 
   if (!isMounted) {
+    console.log('TasksToday: Not mounted, showing skeleton');
     return (
       <div className={`relative ${className}`}>
         <Button variant="outline" size="sm" disabled>
@@ -217,12 +262,17 @@ export default function TasksToday({ className = '' }: TasksTodayProps) {
     );
   }
 
+  console.log('TasksToday: Rendering button, tasks:', tasks?.totalCount || 0);
+  
   return (
     <div className={`relative ${className}`}>
       <Button
         variant="outline"
         size="sm"
-        onClick={() => setIsOpen(!isOpen)}
+        onClick={() => {
+          console.log('TasksToday: Button clicked, isOpen:', isOpen);
+          setIsOpen(!isOpen);
+        }}
         className="flex items-center gap-2"
       >
         <Calendar className="h-4 w-4" />
@@ -292,6 +342,7 @@ export default function TasksToday({ className = '' }: TasksTodayProps) {
                   {/* Overdue Section */}
                   {tasks.overdue.length > 0 && (
                     <div className="border-b">
+                      {console.log('Rendering overdue section with tasks:', tasks.overdue.map(t => ({ id: t.id, title: t.title, due_date: t.due_date })))}
                       <div className="px-4 py-2 bg-red-100 border-red-200">
                         <h4 className="text-sm font-medium text-red-900 flex items-center gap-2">
                           <AlertCircle className="h-4 w-4" />
@@ -322,7 +373,7 @@ export default function TasksToday({ className = '' }: TasksTodayProps) {
                               <p className="text-sm font-medium truncate text-red-900">{task.title}</p>
                               <div className="flex items-center gap-2 mt-1">
                                 <span className="text-xs text-red-600 font-medium">
-                                  {formatDate(task.due_date)}
+                                  {task.due_date ? formatDate(task.due_date) : 'No due date'}
                                 </span>
                                 <Badge 
                                   variant="outline" 
@@ -341,6 +392,7 @@ export default function TasksToday({ className = '' }: TasksTodayProps) {
                   {/* Due Today Section */}
                   {tasks.dueToday.length > 0 && (
                     <div className="border-b">
+                      {console.log('Rendering due today section with tasks:', tasks.dueToday.map(t => ({ id: t.id, title: t.title, due_date: t.due_date })))}
                       <div className="px-4 py-2 bg-orange-50">
                         <h4 className="text-sm font-medium text-orange-800">Due Today ({tasks.dueToday.length})</h4>
                       </div>
@@ -384,41 +436,6 @@ export default function TasksToday({ className = '' }: TasksTodayProps) {
                     </div>
                   )}
 
-                  {/* Work Tasks Section */}
-                  {tasks.workTasks.length > 0 && (
-                    <div>
-                      <div className="px-4 py-2 bg-blue-50">
-                        <h4 className="text-sm font-medium text-blue-800">Work Tasks ({tasks.workTasks.length})</h4>
-                      </div>
-                      <div className="p-2 space-y-1">
-                        {tasks.workTasks.map((task) => (
-                          <div
-                            key={task.id}
-                            onClick={() => handleTaskClick(task.id)}
-                            className={`flex items-center space-x-3 p-2 rounded-md hover:bg-gray-50 cursor-pointer transition-all duration-300 ${
-                              recentlyUpdated === task.id ? 'bg-green-50 border-green-400 animate-pulse' : ''
-                            }`}
-                          >
-                            {getStatusIcon(task.status)}
-                            <div className="flex-1 min-w-0">
-                              <p className="text-sm font-medium truncate">{task.title}</p>
-                              <div className="flex items-center gap-2 mt-1">
-                                <span className="text-xs text-gray-500 capitalize">
-                                  {task.status.replace('_', ' ')}
-                                </span>
-                                <Badge 
-                                  variant="outline" 
-                                  className={`text-xs ${getPriorityColor(task.priority)}`}
-                                >
-                                  {task.priority}
-                                </Badge>
-                              </div>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
                 </div>
               )}
             </CardContent>
