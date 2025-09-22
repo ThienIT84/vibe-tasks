@@ -133,17 +133,21 @@ export default function TaskListClient({
   }
 
   return (
-    <div className="space-y-6">
-      <TaskFilters 
-        searchParams={searchParams}
-      />
-      <TaskTable 
-        tasks={tasks}
-        setTasks={setTasks}
-        pagination={pagination}
-        totalCount={totalCount}
-        searchParams={searchParams}
-      />
+    <div className="space-y-8 animate-in fade-in-50 duration-700">
+      <div className="animate-in slide-in-from-top-4 duration-500">
+        <TaskFilters 
+          searchParams={searchParams}
+        />
+      </div>
+      <div className="animate-in slide-in-from-bottom-4 duration-700 delay-200">
+        <TaskTable 
+          tasks={tasks}
+          setTasks={setTasks}
+          pagination={pagination}
+          totalCount={totalCount}
+          searchParams={searchParams}
+        />
+      </div>
     </div>
   );
 }

@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation"
 import { supabase } from "@/lib/supabase-browser"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Badge } from "@/components/ui/badge"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
@@ -441,74 +442,121 @@ export default function Dashboard() {
   }
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
-          <p className="text-muted-foreground">
-            Track your task progress and manage your workflow
-          </p>
-        </div>
-        <div className="flex gap-2">
-          <Button 
-            variant="outline" 
-            onClick={() => router.push('/tasks')}
-          >
-            <CheckSquare className="h-4 w-4 mr-2" />
-            View All Tasks
-          </Button>
-          <Button 
-            variant="outline" 
-            onClick={() => Promise.all([fetchTaskCounts(true), fetchTasks()])}
-            disabled={isRefreshingCounts || isFetchingTasks}
-          >
-            <RefreshCw className={`h-4 w-4 mr-2 ${isRefreshingCounts || isFetchingTasks ? 'animate-spin' : ''}`} />
-            Refresh
-          </Button>
-          <Button 
-            variant="outline" 
-            onClick={testSession}
-          >
-            Test Session
-          </Button>
-          <Button 
-            variant={showAnalytics ? "default" : "outline"}
-            onClick={() => setShowAnalytics(!showAnalytics)}
-          >
-            <BarChart3 className="h-4 w-4 mr-2" />
-            {showAnalytics ? "Hide Analytics" : "Show Analytics"}
-          </Button>
-          <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-            <DialogTrigger asChild>
-              <Button disabled={isCreating}>
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+      <div className="container mx-auto px-4 py-8">
+        <div className="space-y-8 animate-in fade-in-50 duration-700">
+      {/* Modern Header */}
+      <div className="relative">
+        <div className="absolute inset-0 bg-gradient-to-r from-blue-600/10 via-purple-600/10 to-pink-600/10 rounded-3xl blur-3xl" />
+        <div className="relative bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm rounded-3xl p-8 border border-white/20 dark:border-gray-700/20 shadow-2xl">
+          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
+            <div className="space-y-4">
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-purple-600 rounded-2xl flex items-center justify-center shadow-lg">
+                  <BarChart3 className="h-6 w-6 text-white" />
+                </div>
+                <div>
+                  <h1 className="text-4xl font-bold bg-gradient-to-r from-blue-600 via-purple-600 to-pink-600 bg-clip-text text-transparent">
+                    Dashboard
+                  </h1>
+                  <p className="text-muted-foreground text-lg">
+                    Track your progress and manage your workflow
+                  </p>
+                </div>
+              </div>
+              
+              {/* Quick Stats */}
+              <div className="flex items-center gap-6 text-sm">
+                <div className="flex items-center gap-2">
+                  <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                  <span className="text-muted-foreground">Total Tasks:</span>
+                  <span className="font-semibold">{counts.pending + counts.inProgress + counts.done}</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                  <span className="text-muted-foreground">Completed:</span>
+                  <span className="font-semibold">{counts.done}</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="w-2 h-2 bg-orange-500 rounded-full"></div>
+                  <span className="text-muted-foreground">In Progress:</span>
+                  <span className="font-semibold">{counts.inProgress}</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Action Buttons */}
+            <div className="flex flex-wrap items-center gap-3">
+              <Button 
+                variant="outline" 
+                size="sm"
+                onClick={() => router.push('/tasks')}
+                className="border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-800 transition-all duration-200"
+              >
+                <CheckSquare className="h-4 w-4 mr-2" />
+                View All Tasks
+              </Button>
+              
+              <Button 
+                variant="outline" 
+                size="sm"
+                onClick={() => Promise.all([fetchTaskCounts(true), fetchTasks()])}
+                disabled={isRefreshingCounts || isFetchingTasks}
+                className="border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-800 transition-all duration-200"
+              >
+                <RefreshCw className={`h-4 w-4 mr-2 ${isRefreshingCounts || isFetchingTasks ? 'animate-spin' : ''}`} />
+                Refresh
+              </Button>
+              
+              <Button 
+                variant={showAnalytics ? "default" : "outline"}
+                size="sm"
+                onClick={() => setShowAnalytics(!showAnalytics)}
+                className={showAnalytics 
+                  ? "bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white shadow-lg hover:shadow-xl transition-all duration-200 transform hover:scale-105" 
+                  : "border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-800 transition-all duration-200"
+                }
+              >
+                <BarChart3 className="h-4 w-4 mr-2" />
+                {showAnalytics ? "Hide Analytics" : "Show Analytics"}
+              </Button>
+              
+              <Button 
+                size="sm"
+                onClick={() => setIsDialogOpen(true)}
+                disabled={isCreating}
+                className="bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white shadow-lg hover:shadow-xl transition-all duration-200 transform hover:scale-105"
+              >
                 <Plus className="h-4 w-4 mr-2" />
                 {isCreating ? "Creating..." : "Create Task"}
               </Button>
-            </DialogTrigger>
-            <DialogContent className="max-w-2xl">
-              <DialogHeader>
-                <DialogTitle>{editingTask ? 'Edit Task' : 'Create Task'}</DialogTitle>
-              </DialogHeader>
-              <TaskForm
-                initialData={editingTask ? {
-                  title: editingTask.title,
-                  description: editingTask.description || '',
-                  due_date: editingTask.due_date || '',
-                  priority: editingTask.priority,
-                  status: editingTask.status,
-                } : undefined}
-                onSubmit={handleCreateOrUpdateTask}
-                onCancel={() => {
-                  setIsDialogOpen(false);
-                  setEditingTask(null);
-                }}
-                isLoading={isCreating}
-                submitButtonText={editingTask ? 'Save Changes' : 'Create Task'}
-                title={editingTask ? 'Edit Task' : 'Create Task'}
-              />
-            </DialogContent>
-          </Dialog>
+              
+              <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+                <DialogContent className="max-w-2xl">
+                  <DialogHeader>
+                    <DialogTitle className="text-2xl font-bold">{editingTask ? 'Edit Task' : 'Create Task'}</DialogTitle>
+                  </DialogHeader>
+                  <TaskForm
+                    initialData={editingTask ? {
+                      title: editingTask.title,
+                      description: editingTask.description || '',
+                      due_date: editingTask.due_date || '',
+                      priority: editingTask.priority,
+                      status: editingTask.status,
+                    } : undefined}
+                    onSubmit={handleCreateOrUpdateTask}
+                    onCancel={() => {
+                      setIsDialogOpen(false);
+                      setEditingTask(null);
+                    }}
+                    isLoading={isCreating}
+                    submitButtonText={editingTask ? 'Save Changes' : 'Create Task'}
+                    title={editingTask ? 'Edit Task' : 'Create Task'}
+                  />
+                </DialogContent>
+              </Dialog>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -558,65 +606,229 @@ export default function Dashboard() {
         </Card>
       )}
 
-      {/* Task Counters */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <Card>
+      {/* Quick Actions */}
+      <Card className="border-0 shadow-xl bg-gradient-to-br from-white to-gray-50 dark:from-gray-800 dark:to-gray-900">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <div className="w-2 h-2 bg-purple-500 rounded-full"></div>
+            Quick Actions
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <Button 
+              variant="outline" 
+              className="h-20 flex flex-col gap-2 hover:bg-green-50 dark:hover:bg-green-900/20 transition-all duration-200"
+              onClick={() => router.push('/tasks?status=pending')}
+            >
+              <Circle className="h-6 w-6 text-green-600" />
+              <span className="text-sm font-medium">Pending Tasks</span>
+            </Button>
+            <Button 
+              variant="outline" 
+              className="h-20 flex flex-col gap-2 hover:bg-orange-50 dark:hover:bg-orange-900/20 transition-all duration-200"
+              onClick={() => router.push('/tasks?status=in_progress')}
+            >
+              <Clock className="h-6 w-6 text-orange-600" />
+              <span className="text-sm font-medium">In Progress</span>
+            </Button>
+            <Button 
+              variant="outline" 
+              className="h-20 flex flex-col gap-2 hover:bg-purple-50 dark:hover:bg-purple-900/20 transition-all duration-200"
+              onClick={() => setShowAnalytics(true)}
+            >
+              <BarChart3 className="h-6 w-6 text-purple-600" />
+              <span className="text-sm font-medium">Analytics</span>
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Enhanced Task Counters */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        {/* Pending Tasks */}
+        <Card className="group hover:shadow-2xl transition-all duration-300 border-0 shadow-xl bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-950/20 dark:to-indigo-950/20 overflow-hidden">
+          <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-blue-500 to-indigo-600" />
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">Pending</p>
+              <div className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <Circle className="h-5 w-5 text-blue-500" />
+                  <p className="text-sm font-semibold text-blue-700 dark:text-blue-300">Pending Tasks</p>
+                </div>
                 {isRefreshingCounts ? (
-                  <div className="flex items-center">
-                    <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-500 mr-2"></div>
+                  <div className="flex items-center gap-2">
+                    <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-500"></div>
                     <Skeleton className="h-8 w-12" />
                   </div>
                 ) : (
-                  <p className="text-3xl font-bold">{counts.pending}</p>
+                  <div className="space-y-1">
+                    <p className="text-4xl font-bold text-blue-600 dark:text-blue-400">{counts.pending}</p>
+                    <p className="text-xs text-blue-600/70 dark:text-blue-400/70">Waiting to start</p>
+                  </div>
                 )}
               </div>
-              <Circle className="h-8 w-8 text-blue-500" />
+              <div className="w-16 h-16 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform duration-300 shadow-lg">
+                <Circle className="h-8 w-8 text-white" />
+              </div>
             </div>
+            {!isRefreshingCounts && (
+              <div className="mt-4">
+                <div className="w-full bg-blue-200 dark:bg-blue-800 rounded-full h-2">
+                  <div 
+                    className="bg-gradient-to-r from-blue-500 to-indigo-500 h-2 rounded-full transition-all duration-1000"
+                    style={{ 
+                      width: `${counts.pending + counts.inProgress + counts.done > 0 
+                        ? (counts.pending / (counts.pending + counts.inProgress + counts.done)) * 100 
+                        : 0}%` 
+                    }}
+                  />
+                </div>
+              </div>
+            )}
           </CardContent>
         </Card>
 
-        <Card>
+        {/* In Progress Tasks */}
+        <Card className="group hover:shadow-2xl transition-all duration-300 border-0 shadow-xl bg-gradient-to-br from-orange-50 to-amber-50 dark:from-orange-950/20 dark:to-amber-950/20 overflow-hidden">
+          <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-orange-500 to-amber-600" />
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">In Progress</p>
+              <div className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <Clock className="h-5 w-5 text-orange-500" />
+                  <p className="text-sm font-semibold text-orange-700 dark:text-orange-300">In Progress</p>
+                </div>
                 {isRefreshingCounts ? (
-                  <div className="flex items-center">
-                    <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-yellow-500 mr-2"></div>
+                  <div className="flex items-center gap-2">
+                    <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-orange-500"></div>
                     <Skeleton className="h-8 w-12" />
                   </div>
                 ) : (
-                  <p className="text-3xl font-bold">{counts.inProgress}</p>
+                  <div className="space-y-1">
+                    <p className="text-4xl font-bold text-orange-600 dark:text-orange-400">{counts.inProgress}</p>
+                    <p className="text-xs text-orange-600/70 dark:text-orange-400/70">Currently working</p>
+                  </div>
                 )}
               </div>
-              <Clock className="h-8 w-8 text-yellow-500" />
+              <div className="w-16 h-16 bg-gradient-to-br from-orange-500 to-amber-600 rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform duration-300 shadow-lg">
+                <Clock className="h-8 w-8 text-white" />
+              </div>
             </div>
+            {!isRefreshingCounts && (
+              <div className="mt-4">
+                <div className="w-full bg-orange-200 dark:bg-orange-800 rounded-full h-2">
+                  <div 
+                    className="bg-gradient-to-r from-orange-500 to-amber-500 h-2 rounded-full transition-all duration-1000"
+                    style={{ 
+                      width: `${counts.pending + counts.inProgress + counts.done > 0 
+                        ? (counts.inProgress / (counts.pending + counts.inProgress + counts.done)) * 100 
+                        : 0}%` 
+                    }}
+                  />
+                </div>
+              </div>
+            )}
           </CardContent>
         </Card>
 
-        <Card>
+        {/* Completed Tasks */}
+        <Card className="group hover:shadow-2xl transition-all duration-300 border-0 shadow-xl bg-gradient-to-br from-green-50 to-emerald-50 dark:from-green-950/20 dark:to-emerald-950/20 overflow-hidden">
+          <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-green-500 to-emerald-600" />
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">Done</p>
+              <div className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <CheckCircle className="h-5 w-5 text-green-500" />
+                  <p className="text-sm font-semibold text-green-700 dark:text-green-300">Completed</p>
+                </div>
                 {isRefreshingCounts ? (
-                  <div className="flex items-center">
-                    <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-green-500 mr-2"></div>
+                  <div className="flex items-center gap-2">
+                    <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-green-500"></div>
                     <Skeleton className="h-8 w-12" />
                   </div>
                 ) : (
-                  <p className="text-3xl font-bold">{counts.done}</p>
+                  <div className="space-y-1">
+                    <p className="text-4xl font-bold text-green-600 dark:text-green-400">{counts.done}</p>
+                    <p className="text-xs text-green-600/70 dark:text-green-400/70">Successfully finished</p>
+                  </div>
                 )}
               </div>
-              <CheckCircle className="h-8 w-8 text-green-500" />
+              <div className="w-16 h-16 bg-gradient-to-br from-green-500 to-emerald-600 rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform duration-300 shadow-lg">
+                <CheckCircle className="h-8 w-8 text-white" />
+              </div>
             </div>
+            {!isRefreshingCounts && (
+              <div className="mt-4">
+                <div className="w-full bg-green-200 dark:bg-green-800 rounded-full h-2">
+                  <div 
+                    className="bg-gradient-to-r from-green-500 to-emerald-500 h-2 rounded-full transition-all duration-1000"
+                    style={{ 
+                      width: `${counts.pending + counts.inProgress + counts.done > 0 
+                        ? (counts.done / (counts.pending + counts.inProgress + counts.done)) * 100 
+                        : 0}%` 
+                    }}
+                  />
+                </div>
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>
+
+      {/* Today's Tasks */}
+      <Card className="border-0 shadow-xl bg-gradient-to-br from-orange-50 to-red-50 dark:from-orange-950/20 dark:to-red-950/20">
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <CardTitle className="flex items-center gap-2">
+              <div className="w-2 h-2 bg-orange-500 rounded-full"></div>
+              Today's Tasks
+            </CardTitle>
+            <Badge variant="outline" className="border-orange-200 text-orange-700 dark:border-orange-800 dark:text-orange-300">
+              {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })}
+            </Badge>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-3">
+            {tasks.filter(task => {
+              if (!task.due_date) return false;
+              const today = new Date().toISOString().split('T')[0];
+              return task.due_date === today;
+            }).length > 0 ? (
+              tasks.filter(task => {
+                if (!task.due_date) return false;
+                const today = new Date().toISOString().split('T')[0];
+                return task.due_date === today;
+              }).map((task) => (
+                <div key={task.id} className="flex items-center justify-between p-3 bg-white dark:bg-gray-800 rounded-lg border border-orange-200 dark:border-orange-800">
+                  <div className="flex items-center gap-3">
+                    <div className={`w-3 h-3 rounded-full ${
+                      task.priority === 'urgent' ? 'bg-red-500' :
+                      task.priority === 'high' ? 'bg-orange-500' :
+                      task.priority === 'medium' ? 'bg-yellow-500' :
+                      'bg-green-500'
+                    }`} />
+                    <span className="font-medium">{task.title}</span>
+                  </div>
+                  <Badge className={
+                    task.status === 'done' ? 'bg-green-100 text-green-800 dark:bg-green-800/30 dark:text-green-300' :
+                    task.status === 'in_progress' ? 'bg-blue-100 text-blue-800 dark:bg-blue-800/30 dark:text-blue-300' :
+                    'bg-yellow-100 text-yellow-800 dark:bg-yellow-800/30 dark:text-yellow-300'
+                  }>
+                    {task.status.replace('_', ' ')}
+                  </Badge>
+                </div>
+              ))
+            ) : (
+              <div className="text-center py-6 text-muted-foreground">
+                <Clock className="h-8 w-8 mx-auto mb-2 text-orange-500" />
+                <p>No tasks due today</p>
+              </div>
+            )}
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Task List */}
       <Card>
@@ -726,6 +938,8 @@ export default function Dashboard() {
           </div>
         </CardContent>
       </Card>
+        </div>
+      </div>
     </div>
   )
 }

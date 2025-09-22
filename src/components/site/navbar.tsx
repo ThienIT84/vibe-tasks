@@ -7,6 +7,7 @@ import { useState, useEffect } from "react"
 import { supabase } from "@/lib/supabase-browser"
 import { toast } from "sonner"
 import TasksToday from "@/components/tasks/TasksToday"
+import { ThemeToggle } from "@/components/ui/theme-toggle"
 
 export default function Navbar() {
   const pathname = usePathname()
@@ -21,6 +22,7 @@ export default function Navbar() {
     { name: 'Dashboard', href: '/dashboard', icon: BarChart3 },
     { name: 'Tasks', href: '/tasks', icon: CheckSquare },
     { name: 'Profile', href: '/profile', icon: User },
+    { name: 'Theme Demo', href: '/theme-demo', icon: User },
   ]
 
   const isActive = (href: string) => {
@@ -110,6 +112,7 @@ export default function Navbar() {
             {isMounted && isAuthenticated && (
               <TasksToday />
             )}
+            {isMounted && <ThemeToggle />}
             {!isMounted ? (
               // Loading state
               <div className="flex items-center gap-2">
@@ -189,6 +192,15 @@ export default function Navbar() {
               {isMounted && isAuthenticated && (
                 <div className="pt-2 border-t">
                   <TasksToday className="w-full" />
+                </div>
+              )}
+              {/* Mobile Theme Toggle */}
+              {isMounted && (
+                <div className="pt-2 border-t">
+                  <div className="flex items-center justify-between px-2 py-2">
+                    <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Theme</span>
+                    <ThemeToggle />
+                  </div>
                 </div>
               )}
               <div className="pt-2 border-t space-y-1">

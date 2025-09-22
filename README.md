@@ -11,6 +11,9 @@ A modern task management application built with Next.js 14, TypeScript, and Supa
 - **Real-time Updates**: Live data synchronization
 - **Responsive Design**: Works on desktop and mobile
 - **Authentication**: Secure user authentication with Supabase
+- **Dark Mode**: Seamless light/dark theme switching with system preference detection
+- **Advanced Analytics**: Comprehensive dashboard with productivity insights
+- **Cross-tab Sync**: Real-time synchronization across browser tabs
 
 ## 🛠️ Tech Stack
 

@@ -30,7 +30,8 @@ import {
   Trash2, 
   ChevronLeft, 
   ChevronRight,
-  MoreHorizontal 
+  MoreHorizontal,
+  CheckSquare
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { toast } from 'sonner';
@@ -345,81 +346,128 @@ export default function TaskTable({ tasks, setTasks, pagination, totalCount, sea
 
   if (tasks.length === 0) {
     return (
-      <div className="text-center py-12">
-        <div className="text-gray-500 text-lg mb-4">No tasks found</div>
-        <p className="text-gray-400">
+      <div className="flex flex-col items-center justify-center py-16 px-4">
+        <div className="w-24 h-24 bg-gradient-to-br from-blue-100 to-purple-100 dark:from-blue-900/20 dark:to-purple-900/20 rounded-full flex items-center justify-center mb-6 animate-pulse">
+          <CheckSquare className="w-12 h-12 text-blue-500 dark:text-blue-400" />
+        </div>
+        <h3 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
           {searchParams.q || searchParams.status || searchParams.priority 
-            ? 'Try adjusting your filters' 
-            : 'Create your first task to get started'
+            ? 'No tasks match your filters' 
+            : 'No tasks yet'
+          }
+        </h3>
+        <p className="text-gray-500 dark:text-gray-400 text-center max-w-md mb-6">
+          {searchParams.q || searchParams.status || searchParams.priority 
+            ? 'Try adjusting your search criteria or filters to find what you\'re looking for.' 
+            : 'Get started by creating your first task to organize your work and boost productivity.'
           }
         </p>
+        {!(searchParams.q || searchParams.status || searchParams.priority) && (
+          <Button 
+            className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white shadow-lg hover:shadow-xl transition-all duration-200 transform hover:scale-105"
+            onClick={() => window.location.href = '/tasks?action=create'}
+          >
+            <CheckSquare className="w-4 h-4 mr-2" />
+            Create Your First Task
+          </Button>
+        )}
       </div>
     );
   }
 
   return (
-    <div className="space-y-4">
-      {/* Table */}
-      <div className="overflow-x-auto">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b text-left text-muted-foreground">
-              <th className="py-3 pr-4 font-medium">Title</th>
-              <th className="py-3 pr-4 font-medium">Description</th>
-              <th className="py-3 pr-4 font-medium">Priority</th>
-              <th className="py-3 pr-4 font-medium">Status</th>
-              <th className="py-3 pr-4 font-medium">Due Date</th>
-              <th className="py-3 pr-4 font-medium">Created</th>
-              <th className="py-3 text-right font-medium">Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {tasks.map((task) => (
-              <tr key={task.id} className="border-b hover:bg-gray-50">
-                <td className="py-3 pr-4">
-                  <div className="font-medium text-gray-900 max-w-[200px] truncate">
+    <div className="space-y-6">
+      {/* Modern Card Grid Layout */}
+      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+        {tasks.map((task, index) => (
+          <div
+            key={task.id}
+            className="group relative bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm hover:shadow-lg transition-all duration-300 overflow-hidden animate-in fade-in-50 slide-in-from-bottom-4 duration-500"
+            style={{ animationDelay: `${index * 100}ms` }}
+          >
+            {/* Priority Indicator */}
+            <div className={`absolute top-0 left-0 right-0 h-1 ${
+              task.priority === 'urgent' ? 'bg-gradient-to-r from-red-500 to-red-600' :
+              task.priority === 'high' ? 'bg-gradient-to-r from-orange-500 to-orange-600' :
+              task.priority === 'medium' ? 'bg-gradient-to-r from-yellow-500 to-yellow-600' :
+              'bg-gradient-to-r from-green-500 to-green-600'
+            }`} />
+            
+            <div className="p-6">
+              {/* Header */}
+              <div className="flex items-start justify-between mb-4">
+                <div className="flex-1 min-w-0">
+                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white truncate group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
                     {task.title}
+                  </h3>
+                  {task.description && (
+                    <p className="text-sm text-gray-600 dark:text-gray-400 mt-1 line-clamp-2">
+                      {task.description}
+                    </p>
+                  )}
+                </div>
+                
+                {/* Status Badge */}
+                <div className="ml-3 flex-shrink-0">
+                  <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium ${
+                    task.status === 'done' ? 'bg-green-100 text-green-800 dark:bg-green-800/30 dark:text-green-300' :
+                    task.status === 'in_progress' ? 'bg-blue-100 text-blue-800 dark:bg-blue-800/30 dark:text-blue-300' :
+                    task.status === 'pending' ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-800/30 dark:text-yellow-300' :
+                    'bg-gray-100 text-gray-800 dark:bg-gray-700/50 dark:text-gray-300'
+                  }`}>
+                    {task.status.replace('_', ' ')}
+                  </span>
+                </div>
+              </div>
+
+              {/* Priority & Due Date */}
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-2">
+                  <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium ${
+                    task.priority === 'urgent' ? 'bg-red-100 text-red-800 dark:bg-red-800/30 dark:text-red-300' :
+                    task.priority === 'high' ? 'bg-orange-100 text-orange-800 dark:bg-orange-800/30 dark:text-orange-300' :
+                    task.priority === 'medium' ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-800/30 dark:text-yellow-300' :
+                    'bg-green-100 text-green-800 dark:bg-green-800/30 dark:text-green-300'
+                  }`}>
+                    {task.priority.charAt(0).toUpperCase() + task.priority.slice(1)}
+                  </span>
+                </div>
+                
+                <div className="text-right">
+                  <div className="text-sm text-gray-600 dark:text-gray-400">
+                    {formatDueDate(task.due_date)}
                   </div>
-                </td>
-                <td className="py-3 pr-4">
-                  <div className="text-gray-600 max-w-[300px] truncate">
-                    {task.description || '-'}
-                  </div>
-                </td>
-                <td className="py-3 pr-4">
-                  <div className="flex items-center gap-2">
-                    <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
-                      task.priority === 'urgent' ? 'bg-red-100 text-red-800' :
-                      task.priority === 'high' ? 'bg-orange-100 text-orange-800' :
-                      task.priority === 'medium' ? 'bg-yellow-100 text-yellow-800' :
-                      'bg-green-100 text-green-800'
-                    }`}>
-                      {task.priority.charAt(0).toUpperCase() + task.priority.slice(1)}
-                    </span>
-                    <Select
-                      value={task.priority}
-                      onValueChange={(value: TaskPriority) => handlePriorityChange(task.id, value)}
-                      disabled={updatingTaskId === task.id}
-                    >
-                      <SelectTrigger className="w-20 h-6 text-xs">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="low">Low</SelectItem>
-                        <SelectItem value="medium">Medium</SelectItem>
-                        <SelectItem value="high">High</SelectItem>
-                        <SelectItem value="urgent">Urgent</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </td>
-                <td className="py-3 pr-4">
+                  {task.due_date && (
+                    <div className="flex justify-end gap-1 mt-1">
+                      {isOverdue(task.due_date) && (
+                        <Badge variant="destructive" className="text-xs px-2 py-0.5">
+                          Overdue
+                        </Badge>
+                      )}
+                      {isDueToday(task.due_date) && !isOverdue(task.due_date) && (
+                        <Badge className="text-xs px-2 py-0.5 bg-orange-500 hover:bg-orange-600 text-white">
+                          Due Today
+                        </Badge>
+                      )}
+                      {isDueSoon(task.due_date) && !isOverdue(task.due_date) && !isDueToday(task.due_date) && (
+                        <Badge variant="outline" className="text-xs px-2 py-0.5 border-orange-200 text-orange-700 bg-orange-50 dark:border-orange-600 dark:text-orange-300 dark:bg-orange-800/20">
+                          Due Soon
+                        </Badge>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Quick Actions */}
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
                   <Select
                     value={task.status}
                     onValueChange={(value: TaskStatus) => handleStatusChange(task.id, value)}
                     disabled={updatingTaskId === task.id}
                   >
-                    <SelectTrigger className="w-32 h-8">
+                    <SelectTrigger className="w-32 h-8 text-xs bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-600">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -429,88 +477,77 @@ export default function TaskTable({ tasks, setTasks, pagination, totalCount, sea
                       <SelectItem value="archived">Archived</SelectItem>
                     </SelectContent>
                   </Select>
-                </td>
-                <td className="py-3 pr-4">
-                  <div className="flex flex-col gap-1">
-                    <span className="text-gray-600">
-                      {formatDueDate(task.due_date)}
-                    </span>
-                    {task.due_date && (
-                      <div className="flex gap-1">
-                        {isOverdue(task.due_date) && (
-                          <Badge variant="destructive" className="text-xs px-2 py-0.5">
-                            Overdue
-                          </Badge>
-                        )}
-                        {isDueToday(task.due_date) && !isOverdue(task.due_date) && (
-                          <Badge variant="default" className="text-xs px-2 py-0.5 bg-orange-500 hover:bg-orange-600">
-                            Due Today
-                          </Badge>
-                        )}
-                        {isDueSoon(task.due_date) && !isOverdue(task.due_date) && !isDueToday(task.due_date) && (
-                          <Badge variant="outline" className="text-xs px-2 py-0.5 border-orange-200 text-orange-700 bg-orange-50">
-                            Due Soon
-                          </Badge>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                </td>
-                <td className="py-3 pr-4 text-gray-600">
-                  {format(new Date(task.inserted_at), 'MMM dd, yyyy')}
-                </td>
-                <td className="py-3 text-right">
-                  <div className="flex items-center justify-end gap-2">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      asChild
-                    >
-                      <Link href={`/tasks/${task.id}`}>
-                        <Eye className="h-4 w-4" />
-                      </Link>
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      disabled={updatingTaskId === task.id}
-                    >
-                      <Edit className="h-4 w-4" />
-                    </Button>
-                    <AlertDialog>
-                      <AlertDialogTrigger asChild>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          disabled={deletingTaskId === task.id}
+                  
+                  <Select
+                    value={task.priority}
+                    onValueChange={(value: TaskPriority) => handlePriorityChange(task.id, value)}
+                    disabled={updatingTaskId === task.id}
+                  >
+                    <SelectTrigger className="w-20 h-8 text-xs bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-600">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="low">Low</SelectItem>
+                      <SelectItem value="medium">Medium</SelectItem>
+                      <SelectItem value="high">High</SelectItem>
+                      <SelectItem value="urgent">Urgent</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="flex items-center gap-1">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    asChild
+                    className="h-8 w-8 p-0 hover:bg-blue-100 dark:hover:bg-blue-800/30 text-gray-600 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400"
+                  >
+                    <Link href={`/tasks/${task.id}`}>
+                      <Eye className="h-4 w-4" />
+                    </Link>
+                  </Button>
+                  
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        disabled={deletingTaskId === task.id}
+                        className="h-8 w-8 p-0 hover:bg-red-100 dark:hover:bg-red-800/30 text-red-500 hover:text-red-600 dark:hover:text-red-400"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>Delete Task</AlertDialogTitle>
+                        <AlertDialogDescription>
+                          Are you sure you want to delete "{task.title}"? This action cannot be undone.
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogAction
+                          onClick={() => handleDelete(task.id)}
+                          className="bg-red-600 hover:bg-red-700"
                         >
-                          <Trash2 className="h-4 w-4 text-red-500" />
-                        </Button>
-                      </AlertDialogTrigger>
-                      <AlertDialogContent>
-                        <AlertDialogHeader>
-                          <AlertDialogTitle>Delete Task</AlertDialogTitle>
-                          <AlertDialogDescription>
-                            Are you sure you want to delete "{task.title}"? This action cannot be undone.
-                          </AlertDialogDescription>
-                        </AlertDialogHeader>
-                        <AlertDialogFooter>
-                          <AlertDialogCancel>Cancel</AlertDialogCancel>
-                          <AlertDialogAction
-                            onClick={() => handleDelete(task.id)}
-                            className="bg-red-600 hover:bg-red-700"
-                          >
-                            Delete
-                          </AlertDialogAction>
-                        </AlertDialogFooter>
-                      </AlertDialogContent>
-                    </AlertDialog>
-                  </div>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+                          Delete
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
+                </div>
+              </div>
+
+              {/* Created Date */}
+              <div className="mt-4 pt-4 border-t border-gray-100 dark:border-gray-700/50">
+                <div className="text-xs text-gray-500 dark:text-gray-400">
+                  Created {format(new Date(task.inserted_at), 'MMM dd, yyyy')}
+                </div>
+              </div>
+            </div>
+          </div>
+        ))}
       </div>
 
       {/* Pagination */}

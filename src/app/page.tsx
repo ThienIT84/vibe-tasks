@@ -1,6 +1,6 @@
 'use client'
 import { useState, useEffect } from "react"
-import { supabase } from "@/lib/supabase"
+import { supabase } from "@/lib/supabase-browser"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -8,6 +8,7 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { toast } from "sonner"
 import Link from "next/link"
 import { CheckCircle, Users, Calendar, Target, ArrowRight, CheckSquare, RefreshCw, Star, Zap, Shield, Code, Github, ExternalLink, TrendingUp, Award, Clock, BarChart3, Sparkles } from "lucide-react"
+import { ThemeToggle } from "@/components/ui/theme-toggle"
 
 interface TaskStats {
   pending: number;
@@ -23,6 +24,12 @@ export default function Home() {
   const [isLoading, setIsLoading] = useState(true)
   const [taskStats, setTaskStats] = useState<TaskStats>({ pending: 0, inProgress: 0, done: 0, total: 0 })
   const [isRefreshing, setIsRefreshing] = useState(false)
+  const [isMounted, setIsMounted] = useState(false)
+
+  // Fix hydration mismatch
+  useEffect(() => {
+    setIsMounted(true)
+  }, [])
 
   // Check authentication status
   useEffect(() => {
@@ -101,7 +108,9 @@ export default function Home() {
   }
 
   return (
-    <div className="space-y-8">
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+      <div className="container mx-auto px-4 py-8">
+        <div className="space-y-8">
       {/* Hero Section */}
       <section className="relative overflow-hidden">
         {/* Background Gradient */}
@@ -145,6 +154,7 @@ export default function Home() {
                 <ExternalLink className="ml-2 h-4 w-4" />
               </Button>
             </Link>
+            {isMounted && <ThemeToggle />}
           </div>
 
           {/* Stats */}
@@ -500,6 +510,8 @@ export default function Home() {
         </div>
       </section>
 
+        </div>
+      </div>
     </div>
   )
 }

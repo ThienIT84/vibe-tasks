@@ -55,128 +55,188 @@ export default function TaskForm({
   const isFormLoading = isLoading || isSubmitting;
 
   return (
-    <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
-      <div className="space-y-2">
-        <label className="text-sm font-medium" htmlFor="title">
-          Title *
-        </label>
-        <Input
-          id="title"
-          placeholder="Enter task title"
-          {...form.register('title')}
-          disabled={isFormLoading}
-        />
-        {form.formState.errors.title && (
-          <p className="text-sm text-red-600">{form.formState.errors.title.message}</p>
-        )}
-      </div>
-
-      <div className="space-y-2">
-        <label className="text-sm font-medium" htmlFor="description">
-          Description
-        </label>
-        <Textarea
-          id="description"
-          placeholder="Enter task description"
-          rows={4}
-          {...form.register('description')}
-          disabled={isFormLoading}
-        />
-        {form.formState.errors.description && (
-          <p className="text-sm text-red-600">{form.formState.errors.description.message}</p>
-        )}
-      </div>
-
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <div className="space-y-2">
-          <label className="text-sm font-medium" htmlFor="due_date">
-            Due Date
+    <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm">
+      <form onSubmit={form.handleSubmit(handleSubmit)} className="p-6 space-y-6">
+        {/* Title Section */}
+        <div className="space-y-3">
+          <label className="text-sm font-semibold text-gray-900 dark:text-white flex items-center gap-2" htmlFor="title">
+            <span className="w-2 h-2 bg-blue-500 rounded-full"></span>
+            Task Title *
           </label>
           <Input
-            id="due_date"
-            type="date"
-            {...form.register('due_date')}
+            id="title"
+            placeholder="Enter a descriptive task title..."
+            {...form.register('title')}
             disabled={isFormLoading}
+            className="h-12 text-lg border-gray-300 dark:border-gray-600 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200"
           />
-          {form.formState.errors.due_date && (
-            <p className="text-sm text-red-600">{form.formState.errors.due_date.message}</p>
+          {form.formState.errors.title && (
+            <p className="text-sm text-red-600 flex items-center gap-1">
+              <span className="w-1 h-1 bg-red-500 rounded-full"></span>
+              {form.formState.errors.title.message}
+            </p>
           )}
         </div>
 
-        <div className="space-y-2">
-          <label className="text-sm font-medium">Priority *</label>
-          <Select
-            value={form.watch('priority')}
-            onValueChange={(value: TaskPriority) => form.setValue('priority', value)}
+        {/* Description Section */}
+        <div className="space-y-3">
+          <label className="text-sm font-semibold text-gray-900 dark:text-white flex items-center gap-2" htmlFor="description">
+            <span className="w-2 h-2 bg-green-500 rounded-full"></span>
+            Description
+          </label>
+          <Textarea
+            id="description"
+            placeholder="Add more details about this task..."
+            rows={4}
+            {...form.register('description')}
             disabled={isFormLoading}
-          >
-            <SelectTrigger>
-              <SelectValue placeholder="Select priority" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="low">Low</SelectItem>
-              <SelectItem value="medium">Medium</SelectItem>
-              <SelectItem value="high">High</SelectItem>
-              <SelectItem value="urgent">Urgent</SelectItem>
-            </SelectContent>
-          </Select>
-          {form.formState.errors.priority && (
-            <p className="text-sm text-red-600">{form.formState.errors.priority.message}</p>
+            className="border-gray-300 dark:border-gray-600 focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-all duration-200 resize-none"
+          />
+          {form.formState.errors.description && (
+            <p className="text-sm text-red-600 flex items-center gap-1">
+              <span className="w-1 h-1 bg-red-500 rounded-full"></span>
+              {form.formState.errors.description.message}
+            </p>
           )}
         </div>
 
-        <div className="space-y-2">
-          <label className="text-sm font-medium">Status *</label>
-          <Select
-            value={form.watch('status')}
-            onValueChange={(value: TaskStatus) => form.setValue('status', value)}
+        {/* Priority, Status, and Due Date */}
+        <div className="space-y-6">
+          {/* Priority */}
+          <div className="space-y-3">
+            <label className="text-sm font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+              <span className="w-2 h-2 bg-orange-500 rounded-full"></span>
+              Priority *
+            </label>
+            <Select
+              value={form.watch('priority')}
+              onValueChange={(value: TaskPriority) => form.setValue('priority', value)}
+              disabled={isFormLoading}
+            >
+              <SelectTrigger className="h-12 border-gray-300 dark:border-gray-600 focus:ring-2 focus:ring-orange-500 focus:border-orange-500 transition-all duration-200">
+                <SelectValue placeholder="Select priority" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="low" className="flex items-center gap-2">
+                  <span className="w-2 h-2 bg-green-500 rounded-full"></span>
+                  Low Priority
+                </SelectItem>
+                <SelectItem value="medium" className="flex items-center gap-2">
+                  <span className="w-2 h-2 bg-yellow-500 rounded-full"></span>
+                  Medium Priority
+                </SelectItem>
+                <SelectItem value="high" className="flex items-center gap-2">
+                  <span className="w-2 h-2 bg-orange-500 rounded-full"></span>
+                  High Priority
+                </SelectItem>
+                <SelectItem value="urgent" className="flex items-center gap-2">
+                  <span className="w-2 h-2 bg-red-500 rounded-full"></span>
+                  Urgent Priority
+                </SelectItem>
+              </SelectContent>
+            </Select>
+            {form.formState.errors.priority && (
+              <p className="text-sm text-red-600 flex items-center gap-1">
+                <span className="w-1 h-1 bg-red-500 rounded-full"></span>
+                {form.formState.errors.priority.message}
+              </p>
+            )}
+          </div>
+
+          {/* Status */}
+          <div className="space-y-3">
+            <label className="text-sm font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+              <span className="w-2 h-2 bg-purple-500 rounded-full"></span>
+              Status *
+            </label>
+            <Select
+              value={form.watch('status')}
+              onValueChange={(value: TaskStatus) => form.setValue('status', value)}
+              disabled={isFormLoading}
+            >
+              <SelectTrigger className="h-12 border-gray-300 dark:border-gray-600 focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-all duration-200">
+                <SelectValue placeholder="Select status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="pending" className="flex items-center gap-2">
+                  <span className="w-2 h-2 bg-yellow-500 rounded-full"></span>
+                  Pending
+                </SelectItem>
+                <SelectItem value="in_progress" className="flex items-center gap-2">
+                  <span className="w-2 h-2 bg-blue-500 rounded-full"></span>
+                  In Progress
+                </SelectItem>
+                <SelectItem value="done" className="flex items-center gap-2">
+                  <span className="w-2 h-2 bg-green-500 rounded-full"></span>
+                  Done
+                </SelectItem>
+                <SelectItem value="archived" className="flex items-center gap-2">
+                  <span className="w-2 h-2 bg-gray-500 rounded-full"></span>
+                  Archived
+                </SelectItem>
+              </SelectContent>
+            </Select>
+            {form.formState.errors.status && (
+              <p className="text-sm text-red-600 flex items-center gap-1">
+                <span className="w-1 h-1 bg-red-500 rounded-full"></span>
+                {form.formState.errors.status.message}
+              </p>
+            )}
+          </div>
+
+          {/* Due Date */}
+          <div className="space-y-3">
+            <label className="text-sm font-semibold text-gray-900 dark:text-white flex items-center gap-2" htmlFor="due_date">
+              <span className="w-2 h-2 bg-indigo-500 rounded-full"></span>
+              Due Date
+            </label>
+            <Input
+              id="due_date"
+              type="date"
+              {...form.register('due_date')}
+              disabled={isFormLoading}
+              className="h-12 border-gray-300 dark:border-gray-600 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all duration-200"
+            />
+            {form.formState.errors.due_date && (
+              <p className="text-sm text-red-600 flex items-center gap-1">
+                <span className="w-1 h-1 bg-red-500 rounded-full"></span>
+                {form.formState.errors.due_date.message}
+              </p>
+            )}
+          </div>
+        </div>
+
+        {/* Action Buttons */}
+        <div className="flex flex-row justify-end gap-4 pt-6 border-t border-gray-200 dark:border-gray-700">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={onCancel}
             disabled={isFormLoading}
+            className="h-12 px-6 border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700 transition-all duration-200"
           >
-            <SelectTrigger>
-              <SelectValue placeholder="Select status" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="pending">Pending</SelectItem>
-              <SelectItem value="in_progress">In Progress</SelectItem>
-              <SelectItem value="done">Done</SelectItem>
-              <SelectItem value="archived">Archived</SelectItem>
-            </SelectContent>
-          </Select>
-          {form.formState.errors.status && (
-            <p className="text-sm text-red-600">{form.formState.errors.status.message}</p>
-          )}
+            <X className="h-4 w-4 mr-2" />
+            Cancel
+          </Button>
+          <Button
+            type="submit"
+            disabled={isFormLoading}
+            className="h-12 px-6 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white shadow-lg hover:shadow-xl transition-all duration-200 transform hover:scale-[1.02]"
+          >
+            {isFormLoading ? (
+              <div className="flex items-center">
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                {isSubmitting ? 'Saving...' : 'Loading...'}
+              </div>
+            ) : (
+              <>
+                <Save className="h-4 w-4 mr-2" />
+                {submitButtonText}
+              </>
+            )}
+          </Button>
         </div>
-      </div>
-
-      <div className="flex flex-col sm:flex-row gap-3 pt-4">
-        <Button
-          type="button"
-          variant="outline"
-          onClick={onCancel}
-          disabled={isFormLoading}
-          className="flex-1 sm:flex-none"
-        >
-          <X className="h-4 w-4 mr-2" />
-          Cancel
-        </Button>
-        <Button
-          type="submit"
-          disabled={isFormLoading}
-          className="flex-1 sm:flex-none bg-blue-600 hover:bg-blue-700"
-        >
-          {isFormLoading ? (
-            <div className="flex items-center">
-              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-              {isSubmitting ? 'Saving...' : 'Loading...'}
-            </div>
-          ) : (
-            <>
-              <Save className="h-4 w-4 mr-2" />
-              {submitButtonText}
-            </>
-          )}
-        </Button>
-      </div>
-    </form>
+      </form>
+    </div>
   );
 }

@@ -24,22 +24,21 @@ export async function middleware(request: NextRequest) {
     }
   )
 
-  // Refresh session if needed
-  const { data: { session } } = await supabase.auth.getSession()
+  // IMPORTANT: Avoid writing any logic between createServerClient and
+  // supabase.auth.getSession(). A simple mistake could make it very hard to debug
+  // issues with users being randomly logged out.
+
+  const {
+    data: { session },
+  } = await supabase.auth.getSession()
+  
+  const user = session?.user
   
   if (session) {
     console.log('Middleware: Session found, user:', session.user.id)
   } else {
     console.log('Middleware: No session found')
   }
-
-  // IMPORTANT: Avoid writing any logic between createServerClient and
-  // supabase.auth.getUser(). A simple mistake could make it very hard to debug
-  // issues with users being randomly logged out.
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
 
   // Protected routes that require authentication
   const protectedRoutes = ['/dashboard', '/tasks', '/profile', '/api/tasks']
