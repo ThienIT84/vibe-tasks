@@ -67,6 +67,7 @@ export async function PUT(
         priority: body.priority,
         status: body.status,
         due_date: body.due_date || null,
+        due_time_type: body.due_time_type || 'custom',
       })
       .eq('id', resolvedParams.id)
       .eq('user_id', user.id)

@@ -36,16 +36,30 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized - no user session' }, { status: 401 });
     }
 
-    // Get today's date in local timezone
+    // Get today's date range in local timezone
     const now = new Date();
-    const todayStr = now.toLocaleDateString('en-CA'); // YYYY-MM-DD format
-    const tomorrow = new Date(now);
-    tomorrow.setDate(tomorrow.getDate() + 1);
-    const tomorrowStr = tomorrow.toLocaleDateString('en-CA');
+    const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0);
+    const endOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
+    
+    // Convert to ISO strings for database comparison
+    const startOfTodayISO = startOfToday.toISOString();
+    const endOfTodayISO = endOfToday.toISOString();
+    
+    // Also get UTC versions for comparison
+    const startOfTodayUTC = new Date(Date.UTC(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0));
+    const endOfTodayUTC = new Date(Date.UTC(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999));
+    const startOfTodayUTCISO = startOfTodayUTC.toISOString();
+    const endOfTodayUTCISO = endOfTodayUTC.toISOString();
     
     console.log('Date comparison:', {
-      today: todayStr,
-      tomorrow: tomorrowStr,
+      local: {
+        startOfToday: startOfTodayISO,
+        endOfToday: endOfTodayISO
+      },
+      utc: {
+        startOfToday: startOfTodayUTCISO,
+        endOfToday: endOfTodayUTCISO
+      },
       currentTime: new Date().toISOString(),
       currentDate: new Date().toDateString(),
       timezone: Intl.DateTimeFormat().resolvedOptions().timeZone
@@ -54,8 +68,8 @@ export async function GET(request: NextRequest) {
     console.log('=== TODAY TASKS API DEBUG ===');
     console.log('User ID:', user.id);
     console.log('Today range:', {
-      todayStr,
-      tomorrowStr,
+      startOfToday: startOfTodayISO,
+      endOfToday: endOfTodayISO,
       currentTime: new Date().toISOString()
     });
 
@@ -81,34 +95,66 @@ export async function GET(request: NextRequest) {
       }))
     });
 
-    // Check if any tasks have due_date matching today
-    const tasksWithTodayDueDate = allUserTasks?.filter(t => t.due_date === todayStr) || [];
-    console.log('Tasks with due_date matching today:', {
+    // Check if any tasks have due_date within today's range
+    const tasksWithTodayDueDate = allUserTasks?.filter(t => {
+      if (!t.due_date) return false;
+      const taskDate = new Date(t.due_date);
+      return taskDate >= startOfToday && taskDate <= endOfToday;
+    }) || [];
+    console.log('Tasks with due_date within today range:', {
       count: tasksWithTodayDueDate.length,
       tasks: tasksWithTodayDueDate
     });
 
-    // Get tasks due today (not completed)
+    // Get tasks due today (within today's time range and not completed)
+    // Try both local timezone and UTC approaches
     const { data: tasks, error } = await supabase
       .from('tasks')
       .select('*')
       .eq('user_id', user.id)
-      .eq('due_date', todayStr)
+      .gte('due_date', startOfTodayUTCISO)
+      .lte('due_date', endOfTodayUTCISO)
       .neq('status', 'done')
       .order('due_date', { ascending: true });
 
-    console.log('Due today tasks query result:', {
+    console.log('Due today tasks query result (UTC):', {
       count: tasks?.length || 0,
       tasks: tasks?.map(t => ({ id: t.id, title: t.title, due_date: t.due_date })),
-      queryCondition: `due_date = '${todayStr}'`
+      queryCondition: `due_date >= '${startOfTodayUTCISO}' AND due_date <= '${endOfTodayUTCISO}'`
     });
+
+    // If no tasks found with UTC, try local timezone
+    let finalTasks = tasks;
+    if (!tasks || tasks.length === 0) {
+      console.log('No tasks found with UTC, trying local timezone...');
+      const { data: localTasks, error: localError } = await supabase
+        .from('tasks')
+        .select('*')
+        .eq('user_id', user.id)
+        .gte('due_date', startOfTodayISO)
+        .lte('due_date', endOfTodayISO)
+        .neq('status', 'done')
+        .order('due_date', { ascending: true });
+      
+      console.log('Due today tasks query result (Local):', {
+        count: localTasks?.length || 0,
+        tasks: localTasks?.map(t => ({ id: t.id, title: t.title, due_date: t.due_date })),
+        queryCondition: `due_date >= '${startOfTodayISO}' AND due_date <= '${endOfTodayISO}'`
+      });
+      
+      if (localError) {
+        console.error('Local timezone query error:', localError);
+      } else {
+        finalTasks = localTasks;
+      }
+    }
 
     // Get overdue tasks (due before today and not completed)
     const { data: overdueTasks, error: overdueError } = await supabase
       .from('tasks')
       .select('*')
       .eq('user_id', user.id)
-      .lt('due_date', todayStr)
+      .lt('due_date', startOfTodayUTCISO)
       .neq('status', 'done')
       .order('due_date', { ascending: true });
 
@@ -128,7 +174,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Combine tasks
-    const allTasks = [...(overdueTasks || []), ...(tasks || [])];
+    const allTasks = [...(overdueTasks || []), ...(finalTasks || [])];
     const uniqueTasks = allTasks.filter((task, index, self) => 
       index === self.findIndex(t => t.id === task.id)
     );
@@ -136,7 +182,7 @@ export async function GET(request: NextRequest) {
     // Categorize tasks
     const todayTasks = {
       overdue: overdueTasks || [],
-      dueToday: tasks || [],
+      dueToday: finalTasks || [],
       totalCount: uniqueTasks.length
     };
 

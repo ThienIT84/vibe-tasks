@@ -8,6 +8,7 @@
 
 export type TaskPriority = 'low' | 'medium' | 'high' | 'urgent';
 export type TaskStatus = 'pending' | 'in_progress' | 'done' | 'archived';
+export type DueTimeType = 'next_hour' | '2_hours' | '4_hours' | '8_hours' | 'custom';
 
 // =============================================
 // CORE INTERFACES
@@ -27,7 +28,8 @@ export interface Task {
   user_id: string;
   title: string;
   description: string | null;
-  due_date: string | null; // ISO date string (YYYY-MM-DD)
+  due_date: string | null; // ISO timestamp string
+  due_time_type: DueTimeType;
   priority: TaskPriority;
   status: TaskStatus;
   inserted_at: string; // ISO timestamp
@@ -42,6 +44,7 @@ export interface CreateTaskInput {
   title: string;
   description?: string;
   due_date?: string | null;
+  due_time_type?: DueTimeType;
   priority?: TaskPriority;
   status?: TaskStatus;
 }
@@ -50,6 +53,7 @@ export interface UpdateTaskInput {
   title?: string;
   description?: string | null;
   due_date?: string | null;
+  due_time_type?: DueTimeType;
   priority?: TaskPriority;
   status?: TaskStatus;
 }

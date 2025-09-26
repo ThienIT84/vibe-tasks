@@ -72,6 +72,7 @@ export default function Dashboard() {
           title: newTask.title,
           description: newTask.description || null,
           due_date: newTask.due_date || null,
+          due_time_type: 'custom',
           priority: newTask.priority || 'medium',
           status: newTask.status || 'pending'
         })

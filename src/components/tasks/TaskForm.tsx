@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Button } from '@/components/ui/button';
@@ -8,7 +8,8 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { taskSchema, TaskFormData } from '@/lib/schemas/task';
-import { TaskPriority, TaskStatus } from '@/types/task';
+import { TaskPriority, TaskStatus, DueTimeType } from '@/types/task';
+import { calculateDueTime, getDueTimeTypeOptions } from '@/lib/time-utils';
 import { Loader2, Save, X } from 'lucide-react';
 
 interface TaskFormProps {
@@ -29,6 +30,9 @@ export default function TaskForm({
   title = 'Create Task',
 }: TaskFormProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [dueTimeType, setDueTimeType] = useState<DueTimeType>('custom');
+  const [customDateTime, setCustomDateTime] = useState('');
+  const [isMounted, setIsMounted] = useState(false);
 
   const form = useForm<TaskFormData>({
     resolver: zodResolver(taskSchema),
@@ -36,10 +40,29 @@ export default function TaskForm({
       title: initialData?.title || '',
       description: initialData?.description || '',
       due_date: initialData?.due_date || '',
+      due_time_type: initialData?.due_time_type || 'custom',
       priority: initialData?.priority || 'medium',
       status: initialData?.status || 'pending',
     },
   });
+
+  // Fix hydration mismatch
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
+
+  // Initialize due time type and custom date time
+  useEffect(() => {
+    if (initialData?.due_time_type) {
+      setDueTimeType(initialData.due_time_type);
+    }
+    if (initialData?.due_date) {
+      // Convert UTC date to local datetime-local format
+      const date = new Date(initialData.due_date);
+      const localDateTime = new Date(date.getTime() - date.getTimezoneOffset() * 60000);
+      setCustomDateTime(localDateTime.toISOString().slice(0, 16));
+    }
+  }, [initialData]);
 
   const handleSubmit = async (data: TaskFormData) => {
     try {
@@ -184,19 +207,85 @@ export default function TaskForm({
             )}
           </div>
 
-          {/* Due Date */}
+          {/* Deadline */}
           <div className="space-y-3">
-            <label className="text-sm font-semibold text-gray-900 dark:text-white flex items-center gap-2" htmlFor="due_date">
+            <label className="text-sm font-semibold text-gray-900 dark:text-white flex items-center gap-2">
               <span className="w-2 h-2 bg-indigo-500 rounded-full"></span>
-              Due Date
+              Deadline
             </label>
-            <Input
-              id="due_date"
-              type="date"
-              {...form.register('due_date')}
-              disabled={isFormLoading}
-              className="h-12 border-gray-300 dark:border-gray-600 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all duration-200"
-            />
+            
+            {/* Quick Options */}
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+              {getDueTimeTypeOptions().map((option) => (
+                <Button
+                  key={option.value}
+                  type="button"
+                  variant={dueTimeType === option.value ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => {
+                    setDueTimeType(option.value as DueTimeType);
+                    if (option.value !== 'custom') {
+                      const calculatedTime = calculateDueTime(option.value as DueTimeType);
+                      form.setValue('due_date', calculatedTime.toISOString());
+                      form.setValue('due_time_type', option.value as DueTimeType);
+                    } else {
+                      form.setValue('due_date', customDateTime);
+                      form.setValue('due_time_type', 'custom');
+                    }
+                  }}
+                  disabled={isFormLoading}
+                  className="flex items-center gap-2 text-xs h-10"
+                >
+                  <span className="text-sm">{option.icon}</span>
+                  <span className="hidden sm:inline">{option.label}</span>
+                </Button>
+              ))}
+            </div>
+            
+            {/* Custom DateTime Picker */}
+            {dueTimeType === 'custom' && (
+              <div className="space-y-2">
+                <Input
+                  type="datetime-local"
+                  value={customDateTime}
+                  onChange={(e) => {
+                    setCustomDateTime(e.target.value);
+                    // Convert local datetime to UTC ISO string
+                    if (e.target.value) {
+                      const localDate = new Date(e.target.value);
+                      form.setValue('due_date', localDate.toISOString());
+                    } else {
+                      form.setValue('due_date', '');
+                    }
+                    form.setValue('due_time_type', 'custom');
+                  }}
+                  disabled={isFormLoading}
+                  className="h-12 border-gray-300 dark:border-gray-600 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all duration-200"
+                />
+                <p className="text-xs text-gray-500 dark:text-gray-400">
+                  Choose specific date and time
+                </p>
+              </div>
+            )}
+            
+            {/* Show selected deadline */}
+            {form.watch('due_date') && (
+              <div className="p-3 bg-gray-50 dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
+                <p className="text-sm text-gray-600 dark:text-gray-300">
+                  <span className="font-medium">Selected:</span> {form.watch('due_date') && isMounted ? new Date(form.watch('due_date')!).toLocaleString('vi-VN', {
+                    weekday: 'short',
+                    year: 'numeric',
+                    month: 'short',
+                    day: 'numeric',
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    hour12: false,
+                    timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone
+                  }) : 'Loading...'}
+                </p>
+              </div>
+            )}
+            
             {form.formState.errors.due_date && (
               <p className="text-sm text-red-600 flex items-center gap-1">
                 <span className="w-1 h-1 bg-red-500 rounded-full"></span>

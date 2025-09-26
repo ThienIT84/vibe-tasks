@@ -474,7 +474,7 @@ export default function TasksToday({ className = '' }: TasksTodayProps) {
                               <p className="text-sm font-medium truncate">{task.title}</p>
                               <div className="flex items-center gap-2 mt-1">
                                 <span className="text-xs text-gray-500">
-                                  00:00 AM
+                                  {task.due_date ? formatTime(task.due_date) : 'No time'}
                                 </span>
                                 <Badge 
                                   variant="outline" 

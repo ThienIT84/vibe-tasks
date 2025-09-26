@@ -53,6 +53,7 @@ export async function POST(req: NextRequest) {
     title: body.title,
     description: body.description ?? null,
     due_date: body.due_date ?? null,
+    due_time_type: body.due_time_type ?? 'custom',
     priority: body.priority ?? 'medium',
     status: body.status ?? 'pending',
   };

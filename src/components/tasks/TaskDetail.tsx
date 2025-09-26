@@ -53,6 +53,9 @@ import { format } from 'date-fns';
 import TaskForm from './TaskForm';
 import TaskDetailSkeleton from './TaskDetailSkeleton';
 import { TaskFormData } from '@/lib/schemas/task';
+import { FullCountdownBadge } from './CountdownBadge';
+import { formatDueDate } from '@/lib/time-utils';
+import { useBroadcastChannel, type BroadcastMessage } from '@/lib/hooks/broadcast';
 
 interface TaskDetailProps {
   task: Task;
@@ -70,6 +73,9 @@ export default function TaskDetail({ task, onTaskUpdate }: TaskDetailProps) {
   useEffect(() => {
     setIsMounted(true);
   }, []);
+
+  // Broadcast channel for cross-tab communication
+  const { broadcastTaskStatusChanged } = useBroadcastChannel('vibe-tasks-sync', () => {});
 
   // Debug logging
   console.log('TaskDetail - task:', task);
@@ -114,7 +120,7 @@ export default function TaskDetail({ task, onTaskUpdate }: TaskDetailProps) {
   const formatDate = (dateString: string | null) => {
     if (!dateString) return 'No due date';
     if (!isMounted) return 'Loading...';
-    return format(new Date(dateString), 'MMM dd, yyyy');
+    return formatDueDate(dateString);
   };
 
   const isDueSoon = (dueDate: string | null) => {
@@ -160,6 +166,7 @@ export default function TaskDetail({ task, onTaskUpdate }: TaskDetailProps) {
           priority: task.priority,
           status: newStatus,
           due_date: task.due_date,
+          due_time_type: task.due_time_type || 'custom',
         }),
       });
 
@@ -171,6 +178,10 @@ export default function TaskDetail({ task, onTaskUpdate }: TaskDetailProps) {
       
       if (data.task) {
         toast.success('Task status updated successfully');
+        
+        // Broadcast status change to other tabs
+        broadcastTaskStatusChanged(task.id, newStatus);
+        
         onTaskUpdate?.();
         router.refresh();
       }
@@ -197,6 +208,7 @@ export default function TaskDetail({ task, onTaskUpdate }: TaskDetailProps) {
           priority: data.priority,
           status: data.status,
           due_date: data.due_date ? data.due_date : null,
+          due_time_type: data.due_time_type || 'custom',
         }),
       });
 
@@ -291,27 +303,15 @@ export default function TaskDetail({ task, onTaskUpdate }: TaskDetailProps) {
                 <div className="flex items-center gap-2">
                   <Calendar className="w-4 h-4" />
                   <span className="font-medium">Due:</span>
-                  <span className={isOverdue(task.due_date) ? 'text-red-600 font-semibold' : ''}>
-                    {formatDate(task.due_date)}
-                  </span>
-                  {task.due_date && (
-                    <div className="flex gap-2 ml-2">
-                      {isOverdue(task.due_date) && (
-                        <Badge variant="destructive" className="text-xs px-2 py-1 animate-pulse">
-                          Overdue
-                        </Badge>
-                      )}
-                      {isDueToday(task.due_date) && !isOverdue(task.due_date) && (
-                        <Badge className="text-xs px-2 py-1 bg-orange-500 hover:bg-orange-600 text-white animate-pulse">
-                          Due Today
-                        </Badge>
-                      )}
-                      {isDueSoon(task.due_date) && !isOverdue(task.due_date) && !isDueToday(task.due_date) && (
-                        <Badge variant="outline" className="text-xs px-2 py-1 border-orange-200 text-orange-700 bg-orange-50 dark:border-orange-800 dark:text-orange-300 dark:bg-orange-900/20">
-                          Due Soon
-                        </Badge>
-                      )}
+                  {task.due_date ? (
+                    <div className="flex items-center gap-3">
+                      <span className={isOverdue(task.due_date) ? 'text-red-600 font-semibold' : ''}>
+                        {formatDate(task.due_date)}
+                      </span>
+                      <FullCountdownBadge dueDate={task.due_date} />
                     </div>
+                  ) : (
+                    <span className="text-gray-500">No due date</span>
                   )}
                 </div>
                 
@@ -435,6 +435,7 @@ export default function TaskDetail({ task, onTaskUpdate }: TaskDetailProps) {
               title: task.title,
               description: task.description || '',
               due_date: task.due_date || '',
+              due_time_type: task.due_time_type || 'custom',
               priority: task.priority,
               status: task.status,
             }}

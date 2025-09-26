@@ -37,7 +37,9 @@ export default function Dashboard() {
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null)
   const [counts, setCounts] = useState<{ pending: number; inProgress: number; done: number }>({ pending: 0, inProgress: 0, done: 0 })
   const [tasks, setTasks] = useState<Task[]>([])
+  const [todayTasks, setTodayTasks] = useState<Task[]>([])
   const [isFetchingTasks, setIsFetchingTasks] = useState(false)
+  const [isFetchingTodayTasks, setIsFetchingTodayTasks] = useState(false)
   const [editingTask, setEditingTask] = useState<Task | null>(null)
   const [isDeleting, setIsDeleting] = useState<string | null>(null)
   const [isUpdating, setIsUpdating] = useState<string | null>(null)
@@ -50,6 +52,7 @@ export default function Dashboard() {
   const isFetchingCountsRef = useRef(false)
   const fetchTaskCountsRef = useRef<((showRefreshIndicator?: boolean) => Promise<void>) | undefined>(undefined)
   const fetchTasksRef = useRef<(() => Promise<void>) | undefined>(undefined)
+  const fetchTodayTasksRef = useRef<(() => Promise<void>) | undefined>(undefined)
 
   // Test session function
   const testSession = async () => {
@@ -73,32 +76,38 @@ export default function Dashboard() {
         console.log('Dashboard: Task created, refreshing data');
         fetchTaskCountsRef.current?.(true);
         fetchTasksRef.current?.();
+        fetchTodayTasksRef.current?.();
         break;
       case 'TASK_UPDATED':
         console.log('Dashboard: Task updated, refreshing data');
         fetchTaskCountsRef.current?.(true);
         fetchTasksRef.current?.();
+        fetchTodayTasksRef.current?.();
         break;
       case 'TASK_DELETED':
         console.log('Dashboard: Task deleted, refreshing data');
         fetchTaskCountsRef.current?.(true);
         fetchTasksRef.current?.();
+        fetchTodayTasksRef.current?.();
         break;
       case 'TASK_STATUS_CHANGED':
         console.log('Dashboard: Task status changed, refreshing data');
         fetchTaskCountsRef.current?.(true);
         fetchTasksRef.current?.();
+        fetchTodayTasksRef.current?.();
         break;
       case 'TASK_PRIORITY_CHANGED':
         console.log('Dashboard: Task priority changed, refreshing data');
         fetchTaskCountsRef.current?.(true);
         fetchTasksRef.current?.();
+        fetchTodayTasksRef.current?.();
         break;
       case 'REFRESH_DASHBOARD':
         // Force refresh dashboard
         console.log('Dashboard: Force refreshing dashboard');
         fetchTaskCountsRef.current?.(true);
         fetchTasksRef.current?.();
+        fetchTodayTasksRef.current?.();
         break;
     }
   }, []);
@@ -185,8 +194,8 @@ export default function Dashboard() {
           setUserProfile(fallbackProfile)
         }
 
-        // Fetch task counters and list
-        await Promise.all([fetchTaskCounts(), fetchTasks()])
+        // Fetch task counters, list, and today tasks
+        await Promise.all([fetchTaskCounts(), fetchTasks(), fetchTodayTasks()])
       } catch (error) {
         console.error('Error fetching user:', error)
         toast.error('Failed to load user data')
@@ -262,11 +271,32 @@ export default function Dashboard() {
     }
   }
 
+  const fetchTodayTasks = async () => {
+    try {
+      setIsFetchingTodayTasks(true)
+      const response = await fetch('/api/tasks/today')
+      if (!response.ok) {
+        throw new Error('Failed to fetch today tasks')
+      }
+      const data = await response.json()
+      if (data.tasks) {
+        // Only show due today tasks, not overdue
+        setTodayTasks(data.tasks.dueToday || [])
+      }
+    } catch (e) {
+      console.error('Failed to fetch today tasks', e)
+      toast.error('Failed to load today tasks')
+    } finally {
+      setIsFetchingTodayTasks(false)
+    }
+  }
+
   // Update refs when functions are defined
   useEffect(() => {
     fetchTaskCountsRef.current = fetchTaskCounts;
     fetchTasksRef.current = fetchTasks;
-  }, [fetchTaskCounts, fetchTasks]);
+    fetchTodayTasksRef.current = fetchTodayTasks;
+  }, [fetchTaskCounts, fetchTasks, fetchTodayTasks]);
 
   const handleCreateOrUpdateTask = async (data: TaskFormData) => {
     try {
@@ -320,7 +350,7 @@ export default function Dashboard() {
       setIsDialogOpen(false)
       setNewTask({ title: '', description: '', status: 'pending', priority: 'medium', due_date: '' })
       setEditingTask(null)
-      await Promise.all([fetchTaskCounts(true), fetchTasks()])
+      await Promise.all([fetchTaskCounts(true), fetchTasks(), fetchTodayTasks()])
     } catch (e: unknown) {
       toast.error((e as Error)?.message || 'Unexpected error')
     } finally {
@@ -335,6 +365,7 @@ export default function Dashboard() {
   }
 
   const handleDeleteTask = async (task: Task) => {
+    if (!isMounted) return;
     const confirmDelete = window.confirm(`Delete task "${task.title}"?`)
     if (!confirmDelete) return
     try {
@@ -347,7 +378,7 @@ export default function Dashboard() {
       toast.success('Task deleted successfully')
       // Broadcast task deletion to other tabs
       broadcastTaskDeleted(task.id);
-      await Promise.all([fetchTaskCounts(true), fetchTasks()])
+      await Promise.all([fetchTaskCounts(true), fetchTasks(), fetchTodayTasks()])
     } catch (e: unknown) {
       toast.error((e as Error)?.message || 'Failed to delete task')
     } finally {
@@ -500,11 +531,11 @@ export default function Dashboard() {
               <Button 
                 variant="outline" 
                 size="sm"
-                onClick={() => Promise.all([fetchTaskCounts(true), fetchTasks()])}
-                disabled={isRefreshingCounts || isFetchingTasks}
+                onClick={() => Promise.all([fetchTaskCounts(true), fetchTasks(), fetchTodayTasks()])}
+                disabled={isRefreshingCounts || isFetchingTasks || isFetchingTodayTasks}
                 className="border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-800 transition-all duration-200"
               >
-                <RefreshCw className={`h-4 w-4 mr-2 ${isRefreshingCounts || isFetchingTasks ? 'animate-spin' : ''}`} />
+                <RefreshCw className={`h-4 w-4 mr-2 ${isRefreshingCounts || isFetchingTasks || isFetchingTodayTasks ? 'animate-spin' : ''}`} />
                 Refresh
               </Button>
               
@@ -785,22 +816,19 @@ export default function Dashboard() {
               Today's Tasks
             </CardTitle>
             <Badge variant="outline" className="border-orange-200 text-orange-700 dark:border-orange-800 dark:text-orange-300">
-              {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })}
+              {isMounted ? new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' }) : 'Loading...'}
             </Badge>
           </div>
         </CardHeader>
         <CardContent>
           <div className="space-y-3">
-            {tasks.filter(task => {
-              if (!task.due_date) return false;
-              const today = new Date().toISOString().split('T')[0];
-              return task.due_date === today;
-            }).length > 0 ? (
-              tasks.filter(task => {
-                if (!task.due_date) return false;
-                const today = new Date().toISOString().split('T')[0];
-                return task.due_date === today;
-              }).map((task) => (
+            {isFetchingTodayTasks ? (
+              <div className="text-center py-6 text-muted-foreground">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-orange-500 mx-auto mb-2"></div>
+                <p>Loading today's tasks...</p>
+              </div>
+            ) : todayTasks.length > 0 ? (
+              todayTasks.map((task) => (
                 <div key={task.id} className="flex items-center justify-between p-3 bg-white dark:bg-gray-800 rounded-lg border border-orange-200 dark:border-orange-800">
                   <div className="flex items-center gap-3">
                     <div className={`w-3 h-3 rounded-full ${

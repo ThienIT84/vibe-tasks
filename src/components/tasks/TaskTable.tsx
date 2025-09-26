@@ -4,6 +4,7 @@ import React, { useState, useCallback, useMemo } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Task, TaskStatus, TaskPriority } from '@/types/task';
+import { CompactCountdownBadge } from './CountdownBadge';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { 
@@ -166,6 +167,7 @@ export default function TaskTable({ tasks, setTasks, pagination, totalCount, sea
           priority: currentTask.priority,
           status: newStatus,
           due_date: currentTask.due_date,
+          due_time_type: currentTask.due_time_type,
         }),
       });
 
@@ -239,6 +241,7 @@ export default function TaskTable({ tasks, setTasks, pagination, totalCount, sea
           priority: newPriority,
           status: currentTask.status,
           due_date: currentTask.due_date,
+          due_time_type: currentTask.due_time_type,
         }),
       });
 
@@ -434,26 +437,16 @@ export default function TaskTable({ tasks, setTasks, pagination, totalCount, sea
                 </div>
                 
                 <div className="text-right">
-                  <div className="text-sm text-gray-600 dark:text-gray-400">
-                    {formatDueDate(task.due_date)}
-                  </div>
-                  {task.due_date && (
-                    <div className="flex justify-end gap-1 mt-1">
-                      {isOverdue(task.due_date) && (
-                        <Badge variant="destructive" className="text-xs px-2 py-0.5">
-                          Overdue
-                        </Badge>
-                      )}
-                      {isDueToday(task.due_date) && !isOverdue(task.due_date) && (
-                        <Badge className="text-xs px-2 py-0.5 bg-orange-500 hover:bg-orange-600 text-white">
-                          Due Today
-                        </Badge>
-                      )}
-                      {isDueSoon(task.due_date) && !isOverdue(task.due_date) && !isDueToday(task.due_date) && (
-                        <Badge variant="outline" className="text-xs px-2 py-0.5 border-orange-200 text-orange-700 bg-orange-50 dark:border-orange-600 dark:text-orange-300 dark:bg-orange-800/20">
-                          Due Soon
-                        </Badge>
-                      )}
+                  {task.due_date ? (
+                    <div className="space-y-2">
+                      <div className="text-sm text-gray-600 dark:text-gray-400">
+                        {formatDueDate(task.due_date)}
+                      </div>
+                      <CompactCountdownBadge dueDate={task.due_date} />
+                    </div>
+                  ) : (
+                    <div className="text-sm text-gray-400 dark:text-gray-500">
+                      No deadline
                     </div>
                   )}
                 </div>

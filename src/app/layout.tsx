@@ -12,7 +12,7 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="vi" suppressHydrationWarning>
-      <body className="min-h-dvh bg-background text-foreground transition-colors duration-300">
+      <body className="min-h-dvh bg-background text-foreground transition-colors duration-300" suppressHydrationWarning>
         <ThemeProvider>
           <Navbar />
           <main className="mx-auto max-w-6xl px-4 py-8">{children}</main>

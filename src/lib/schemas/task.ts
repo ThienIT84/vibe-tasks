@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { DueTimeType } from '@/types/task';
 
 export const taskSchema = z.object({
   title: z
@@ -17,16 +18,14 @@ export const taskSchema = z.object({
     .refine((val) => {
       if (!val || val === '') return true; // Optional field
       const date = new Date(val);
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      return date >= today;
-    }, 'Due date must be today or in the future'),
-  priority: z.enum(['low', 'medium', 'high', 'urgent'], {
-    required_error: 'Priority is required',
-  }),
-  status: z.enum(['pending', 'in_progress', 'done', 'archived'], {
-    required_error: 'Status is required',
-  }),
+      const now = new Date();
+      return date > now;
+    }, 'Due date must be in the future'),
+  due_time_type: z.enum(['next_hour', '2_hours', '4_hours', '8_hours', 'custom']).optional(),
+  priority: z.enum(['low', 'medium', 'high', 'urgent']),
+  status: z.enum(['pending', 'in_progress', 'done', 'archived']),
 });
 
-export type TaskFormData = z.infer<typeof taskSchema>;
+export type TaskFormData = z.infer<typeof taskSchema> & {
+  due_time_type?: DueTimeType;
+};
